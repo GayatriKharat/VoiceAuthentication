@@ -4,7 +4,19 @@ import { getFirestore, doc, setDoc, getDoc, collection, query, orderBy, limit, o
 import firebaseConfig from './firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+let firestoreInstance;
+try {
+  // Prefer the configured named database when available.
+  firestoreInstance = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+} catch (error) {
+  // Never hard-crash app boot because of a database-id mismatch.
+  console.warn(
+    'Firebase: Failed to initialize configured Firestore database, falling back to default.',
+    error
+  );
+  firestoreInstance = getFirestore(app);
+}
+export const db = firestoreInstance;
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
@@ -16,7 +28,10 @@ async function testConnection() {
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
       console.error("Firebase: Client is offline. Check configuration.");
+      return;
     }
+    // Log other startup errors without breaking UI rendering.
+    console.warn("Firebase: Connection test failed:", error);
   }
 }
 testConnection();
