@@ -53,7 +53,8 @@ service cloud.firestore {
       return data.keys().hasAll(['uid', 'name', 'email', 'isEnrolled', 'role', 'createdAt']) &&
              data.uid == request.auth.uid &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             isValidEmail(data.email) &&
+             data.email is string &&
+             (data.email == '' || isValidEmail(data.email)) &&
              data.role in ['admin', 'user'] &&
              data.isEnrolled is bool;
     }
@@ -93,7 +94,8 @@ service cloud.firestore {
       allow update: if isOwner(userId) &&
                        isValidUser(request.resource.data) &&
                        (request.resource.data.role == resource.data.role || isAdmin());
-      allow delete: if isAdmin();
+      // Users can delete their OWN enrollment; admins can delete anyone's.
+      allow delete: if isOwner(userId) || isAdmin();
     }
 
     match /file_history/{historyId} {

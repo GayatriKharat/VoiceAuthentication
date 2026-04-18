@@ -9,13 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
-import { UserPlus, ShieldCheck, Languages, Mic } from 'lucide-react';
+import { UserPlus, ShieldCheck, Languages, Mic, AlertTriangle } from 'lucide-react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { averageVoiceprints } from '../utils/audioProcessor';
 import { generateUserKeyMaterial } from '../utils/crypto';
 import { motion, AnimatePresence } from 'framer-motion';
 
-type Step = 'name' | 'phrase' | 'enroll1' | 'enroll2' | 'saving';
+type Step = 'name' | 'phrase' | 'enroll1' | 'enroll2' | 'saving' | 'error';
 
 interface EnrollmentFlowProps {
   currentUser: FirebaseUser;
@@ -44,6 +44,8 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
   const [voiceprint1, setVoiceprint1] = useState<Float32Array | null>(null);
   const [isBiometricOpen, setIsBiometricOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState<string>('Averaging voice samples and synchronising to global registry...');
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const steps: Step[] = ['name', 'phrase', 'enroll1', 'enroll2', 'saving'];
   const currentStepIdx = steps.indexOf(step);
@@ -81,21 +83,26 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
   const handleEnroll2Success = async (result: Float32Array) => {
     setIsBiometricOpen(false);
     setIsSaving(true);
+    setSaveError(null);
     setStep('saving');
 
     if (!voiceprint1 || !result || !auth.currentUser || !phraseSelection) {
-      toast.error('Enrollment data incomplete. Please try again.');
-      onComplete();
+      setSaveError('Enrollment data incomplete. Please start over.');
+      setStep('error');
+      setIsSaving(false);
       return;
     }
 
     try {
-      // Average the two voiceprints for a more robust biometric model
+      setSaveProgress('Averaging voice samples (step 1/3)...');
       const averagedVoiceprint = averageVoiceprints(voiceprint1, result);
       addLog('Averaging two voice samples for optimised biometric model...', 'info');
 
+      setSaveProgress('Generating your personal encryption keypair (step 2/3)... this can take 2-5 seconds');
       addLog('Generating personal encryption keypair for team sharing...', 'info');
       const keyMaterial = await generateUserKeyMaterial(auth.currentUser.uid);
+
+      setSaveProgress('Saving profile to secure cloud (step 3/3)...');
 
       const adminEmail = 'gayatrikharat62@gmail.com';
       const newUser: User = {
@@ -114,7 +121,12 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
         encryptedPrivateKey: keyMaterial.encryptedPrivateKey,
       };
 
-      await setDoc(doc(db, 'users', auth.currentUser.uid), newUser);
+      // Guard against the write hanging forever (bad network / security rule stall)
+      const writePromise = setDoc(doc(db, 'users', auth.currentUser.uid), newUser);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Firestore write timed out after 20s. Check your network and Firestore rules.')), 20000)
+      );
+      await Promise.race([writePromise, timeoutPromise]);
 
       toast.success('Biometric profile enrolled and synchronised globally!');
       addLog(
@@ -124,10 +136,32 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
       onUserEnrolled(newUser);
       onComplete();
     } catch (error) {
+      console.error('[EnrollmentFlow] save failed:', error);
+      const msg =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+          ? error
+          : 'Unknown error while saving enrollment.';
+      setSaveError(msg);
+      setStep('error');
       handleFirestoreError(error, OperationType.CREATE, `users/${auth.currentUser?.uid}`);
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleRetrySave = () => {
+    if (!voiceprint1) {
+      setStep('enroll1');
+      setSaveError(null);
+      setIsBiometricOpen(true);
+      return;
+    }
+    // Re-trigger second sample since that's where the key+save happens
+    setSaveError(null);
+    setStep('enroll2');
+    setTimeout(() => setIsBiometricOpen(true), 300);
   };
 
   const handleEnrollFailure = (reason: string) => {
@@ -287,7 +321,44 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
                 </div>
                 <div className="space-y-2">
                   <p className="text-lg font-bold text-white">Synthesising Biometric Profile</p>
-                  <p className="text-sm text-slate-500">Averaging voice samples and synchronising to global registry...</p>
+                  <p className="text-sm text-slate-500">{saveProgress}</p>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Error state */}
+            {step === 'error' && (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center py-8 space-y-6"
+              >
+                <div className="mx-auto p-4 bg-red-500/10 rounded-2xl border border-red-500/20 w-fit">
+                  <AlertTriangle className="h-8 w-8 text-red-400" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-lg font-bold text-white">Enrollment Failed</p>
+                  <p className="text-sm text-red-400/80 break-words px-4">{saveError}</p>
+                  <p className="text-[11px] text-slate-500 mt-4">
+                    Tip: open the browser console (F12) for the full error.
+                    Common causes: network issue, Firestore rules, or the new account's email not yet verified.
+                  </p>
+                </div>
+                <div className="flex gap-3 justify-center pt-2">
+                  <Button
+                    onClick={handleRetrySave}
+                    className="bg-blue-600 hover:bg-blue-500 font-bold rounded-xl px-6"
+                  >
+                    Retry Recording
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={onComplete}
+                    className="text-slate-400 hover:text-white font-bold rounded-xl px-6"
+                  >
+                    Cancel
+                  </Button>
                 </div>
               </motion.div>
             )}
