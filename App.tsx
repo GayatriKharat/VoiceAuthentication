@@ -6,13 +6,13 @@ import UserPanel from './components/UserPanel';
 import FileActions from './components/FileActions';
 import SystemLog from './components/SystemLog';
 import FileHistoryPanel from './components/FileHistoryPanel';
-import PresentationPanel from './components/PresentationPanel';
 import EnrollmentFlow from './components/EnrollmentFlow';
 import EncryptionFlow from './components/EncryptionFlow';
 import DecryptionFlow from './components/DecryptionFlow';
 import AuthModal from './components/AuthModal';
 import LoginHistoryPanel from './components/LoginHistoryPanel';
 import AccountPanel from './components/AccountPanel';
+import LandingPage from './components/LandingPage';
 import { Toaster, toast } from 'sonner';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
@@ -28,7 +28,7 @@ import {
   deleteDoc,
 } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Globe } from 'lucide-react';
+import { Globe, ShieldCheck } from 'lucide-react';
 import { getLocationInfo } from './utils/locationService';
 
 const MAX_USERS = 50;
@@ -42,7 +42,10 @@ const App: React.FC = () => {
   const [loginSessions, setLoginSessions] = useState<LoginHistoryEntry[]>([]);
   const [activeFlow, setActiveFlow] = useState<'enroll' | 'encrypt' | 'decrypt' | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
-  const [showPresentation, setShowPresentation] = useState(false);
+  const [showLanding, setShowLanding] = useState(
+    () => localStorage.getItem('vas_seen_intro') !== '1'
+  );
+  const [showSecurityFeed, setShowSecurityFeed] = useState(false);
 
   // Prevent duplicate login session logging per browser tab
   const sessionLoggedRef = useRef(false);
@@ -300,9 +303,22 @@ const App: React.FC = () => {
   }
 
   // ---------------------------------------------------------------
-  // Auth gate — AuthModal is now self-contained (no props needed)
+  // Landing + Auth gate
   // ---------------------------------------------------------------
   if (!currentUser) {
+    if (showLanding) {
+      return (
+        <>
+          <LandingPage
+            onLaunch={() => {
+              localStorage.setItem('vas_seen_intro', '1');
+              setShowLanding(false);
+            }}
+          />
+          <Toaster position="bottom-right" theme="dark" closeButton />
+        </>
+      );
+    }
     return <AuthModal />;
   }
 
@@ -315,33 +331,38 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-[#020617] text-slate-200 font-sans selection:bg-blue-500/30">
       <Header user={currentUser} onLogout={handleLogout} />
 
-      <main className="container mx-auto p-4 md:p-8 space-y-8">
-        {/* Dashboard Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-800 pb-8">
+      <main className="container mx-auto p-4 md:p-8 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-800 pb-6">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-blue-400 text-xs font-bold uppercase tracking-widest">
               <Globe className="w-3 h-3" />
-              <span>Global Security Network</span>
+              <span>Secure Collaboration Workspace</span>
             </div>
             <h2 className="text-3xl font-light tracking-tight text-white">
-              Operational <span className="font-bold text-blue-500">Command</span>
+              Welcome back, <span className="font-bold text-blue-500">{currentUser.displayName || 'Operator'}</span>
             </h2>
+            <p className="text-sm text-slate-400">
+              Enroll your voice, encrypt for selected teammates, and decrypt only if authorized.
+            </p>
           </div>
 
           <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-8 px-6 py-3 bg-slate-900/50 rounded-2xl border border-slate-800">
               <div className="text-center">
                 <div className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">
-                  Active Nodes
+                  Team Members
                 </div>
                 <div className="text-xl font-mono text-white">{users.length}</div>
               </div>
               <div className="w-px h-8 bg-slate-800" />
               <div className="text-center">
                 <div className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">
-                  System Health
+                  Security Status
                 </div>
-                <div className="text-xl font-mono text-emerald-400">99.9%</div>
+                <div className="text-xl font-mono text-emerald-400 flex items-center gap-1">
+                  <ShieldCheck className="w-4 h-4" />
+                  Active
+                </div>
               </div>
               <div className="w-px h-8 bg-slate-800" />
               <div className="text-center">
@@ -356,23 +377,26 @@ const App: React.FC = () => {
               </div>
             </div>
             <button
-              onClick={() => setShowPresentation(!showPresentation)}
+              onClick={() => setShowSecurityFeed((s) => !s)}
               className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-all shadow-lg shadow-blue-900/20"
             >
-              {showPresentation ? 'Close Analytics' : 'System Analytics'}
+              {showSecurityFeed ? 'Hide Security Feed' : 'Show Security Feed'}
             </button>
           </div>
         </div>
 
         <AnimatePresence>
-          {showPresentation && (
+          {showSecurityFeed && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <PresentationPanel />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <FileHistoryPanel history={fileHistory} />
+                <SystemLog messages={logMessages} />
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -383,10 +407,8 @@ const App: React.FC = () => {
           onStartDecryption={() => setActiveFlow('decrypt')}
         />
 
-        {/* Main grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Left: User Registry */}
-          <div className="lg:col-span-4 space-y-8">
+          <div className="lg:col-span-5 space-y-8">
             <AccountPanel
               currentUser={currentUser}
               userProfile={userProfile}
@@ -404,12 +426,23 @@ const App: React.FC = () => {
             <LoginHistoryPanel sessions={loginSessions} />
           </div>
 
-          {/* Right: File History + System Logs */}
-          <div className="lg:col-span-8 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <FileHistoryPanel history={fileHistory} />
-              <SystemLog messages={logMessages} />
+          <div className="lg:col-span-7 space-y-8">
+            <div className="rounded-[2rem] border border-slate-800/60 bg-slate-900/30 p-6">
+              <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-400 mb-2">
+                Quick Guide
+              </h3>
+              <p className="text-slate-300 text-sm leading-relaxed">
+                1) Enroll your voice profile once. 2) Encrypt files and choose allowed recipients.
+                3) Recipients verify voice and decrypt only if they are authorized.
+              </p>
             </div>
+            <UserPanel
+              users={users}
+              onDeleteUser={handleDeleteUser}
+              maxUsers={MAX_USERS}
+              currentUserRole={userProfile?.role}
+              currentUserUid={currentUser.uid}
+            />
           </div>
         </div>
       </main>
