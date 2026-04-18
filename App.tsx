@@ -51,6 +51,18 @@ const App: React.FC = () => {
   // Auth Listener
   // ---------------------------------------------------------------
   useEffect(() => {
+    // Safety net: some browser/privacy setups can delay Firebase auth init.
+    // Never let the app stay on a blank loading screen forever.
+    const authReadyFallback = setTimeout(() => {
+      setIsAuthReady((prev) => {
+        if (!prev) {
+          console.warn('Auth init timeout reached; continuing in signed-out mode.');
+          return true;
+        }
+        return prev;
+      });
+    }, 4000);
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setIsAuthReady(true);
@@ -60,7 +72,10 @@ const App: React.FC = () => {
         sessionStorage.removeItem('vas_session_uid');
       }
     });
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(authReadyFallback);
+      unsubscribe();
+    };
   }, []);
 
   // ---------------------------------------------------------------
