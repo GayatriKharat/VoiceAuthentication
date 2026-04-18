@@ -11,11 +11,11 @@ permissions:
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the
-# in-progress run and the latest one.
+# Allow only one concurrent deployment. Don't cancel in-progress deploys —
+# Pages doesn't like that mid-flight.
 concurrency:
   group: 'pages'
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -36,11 +36,14 @@ jobs:
         # (e.g. @rollup/rollup-linux-x64-gnu), which makes `npm ci` fail.
         run: npm install --no-audit --no-fund
 
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
       - name: Build
         env:
-          # Prefix for asset URLs. Must match the repo name with
-          # leading + trailing slash, e.g. /voice-authentication-system/.
-          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          # Use the base path GitHub Pages told us about (e.g. /VoiceAuthentication/)
+          VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
           # Optional: if you add a Gemini key as a repo secret named
           # GEMINI_API_KEY, it will be baked into the build. Safe to omit.
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -50,8 +53,8 @@ jobs:
         # Copy index.html to 404.html so client-side routes don't 404 on reload.
         run: cp dist/index.html dist/404.html
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
+      - name: List dist contents (debug)
+        run: ls -la dist && echo "---" && cat dist/index.html | head -40
 
       - name: Upload build artifact
         uses: actions/upload-pages-artifact@v3
