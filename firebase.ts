@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getFunctions, httpsCallable, type Functions } from 'firebase/functions';
 import { getFirestore, doc, setDoc, getDoc, collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from './firebase-applet-config.json';
 
@@ -19,6 +20,33 @@ try {
 export const db = firestoreInstance;
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+/** Same region as Cloud Functions (`functions/src/index.ts`). */
+const FUNCTIONS_REGION = 'us-central1';
+
+let functionsInstance: Functions | null = null;
+export function getFirebaseFunctions(): Functions {
+  if (!functionsInstance) {
+    functionsInstance = getFunctions(app, FUNCTIONS_REGION);
+  }
+  return functionsInstance;
+}
+
+/**
+ * Sends login + activity summary email if Cloud Functions + SMTP are configured.
+ * Safe to call on every session start; failures are logged only.
+ */
+export async function requestLoginDigestEmail(): Promise<void> {
+  try {
+    const callable = httpsCallable(getFirebaseFunctions(), 'requestLoginDigestEmail');
+    await callable();
+  } catch (e) {
+    console.warn(
+      '[requestLoginDigestEmail] Skipped or failed (deploy functions and set SMTP to enable):',
+      e
+    );
+  }
+}
 
 // Connection test as per guidelines
 async function testConnection() {

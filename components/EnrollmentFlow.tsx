@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import BiometricModal from './BiometricModal';
 import PhraseSelector, { PhraseSelection } from './PhraseSelector';
+import FlowModalShell from './FlowModalShell';
 import { X } from 'lucide-react';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
 import { setDoc, doc } from 'firebase/firestore';
@@ -13,6 +14,7 @@ import { UserPlus, ShieldCheck, Languages, Mic, AlertTriangle } from 'lucide-rea
 import { User as FirebaseUser } from 'firebase/auth';
 import { averageVoiceprints } from '../utils/audioProcessor';
 import { generateUserKeyMaterial } from '../utils/crypto';
+import { recordSecurityEvent } from '../utils/securityAudit';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type Step = 'name' | 'phrase' | 'enroll1' | 'enroll2' | 'saving' | 'error';
@@ -44,13 +46,14 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
   const [voiceprint1, setVoiceprint1] = useState<Float32Array | null>(null);
   const [isBiometricOpen, setIsBiometricOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveProgress, setSaveProgress] = useState<string>('Averaging voice samples and synchronising to global registry...');
+  const [saveProgress, setSaveProgress] = useState<string>(
+    'Averaging voice samples and synchronising to global registry...'
+  );
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const steps: Step[] = ['name', 'phrase', 'enroll1', 'enroll2', 'saving'];
   const currentStepIdx = steps.indexOf(step);
 
-  // ---------------------------------------------------------------
   const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!userName.trim()) return;
@@ -60,26 +63,20 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
 
   const handlePhraseConfirm = (selection: PhraseSelection) => {
     setPhraseSelection(selection);
-    addLog(
-      `Passphrase set in ${selection.language}: "${selection.phrase.slice(0, 30)}..."`,
-      'info'
-    );
+    addLog(`Passphrase set in ${selection.language}: "${selection.phrase.slice(0, 30)}..."`, 'info');
     setStep('enroll1');
     setIsBiometricOpen(true);
   };
 
-  // First voice sample captured
   const handleEnroll1Success = (result: Float32Array) => {
     setIsBiometricOpen(false);
     setVoiceprint1(result);
     toast.success('Voice sample 1 captured! Please record once more.');
     addLog('Voice sample 1 captured successfully.', 'info');
     setStep('enroll2');
-    // Small delay so user sees the feedback
     setTimeout(() => setIsBiometricOpen(true), 800);
   };
 
-  // Second voice sample captured — average and save
   const handleEnroll2Success = async (result: Float32Array) => {
     setIsBiometricOpen(false);
     setIsSaving(true);
@@ -121,10 +118,15 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
         encryptedPrivateKey: keyMaterial.encryptedPrivateKey,
       };
 
-      // Guard against the write hanging forever (bad network / security rule stall)
       const writePromise = setDoc(doc(db, 'users', auth.currentUser.uid), newUser);
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Firestore write timed out after 20s. Check your network and Firestore rules.')), 20000)
+        setTimeout(
+          () =>
+            reject(
+              new Error('Firestore write timed out after 20s. Check your network and Firestore rules.')
+            ),
+          20000
+        )
       );
       await Promise.race([writePromise, timeoutPromise]);
 
@@ -133,6 +135,15 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
         `User ${newUser.name} enrolled with ${phraseSelection.language} passphrase from ${newUser.location}.`,
         'success'
       );
+      if (auth.currentUser) {
+        await recordSecurityEvent(
+          db,
+          auth.currentUser,
+          'ENROLL_COMPLETE',
+          `Voice enrollment and keypair created for ${newUser.name}.`,
+          { language: phraseSelection.language }
+        );
+      }
       onUserEnrolled(newUser);
       onComplete();
     } catch (error) {
@@ -141,8 +152,8 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
         error instanceof Error
           ? error.message
           : typeof error === 'string'
-          ? error
-          : 'Unknown error while saving enrollment.';
+            ? error
+            : 'Unknown error while saving enrollment.';
       setSaveError(msg);
       setStep('error');
       handleFirestoreError(error, OperationType.CREATE, `users/${auth.currentUser?.uid}`);
@@ -158,7 +169,6 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
       setIsBiometricOpen(true);
       return;
     }
-    // Re-trigger second sample since that's where the key+save happens
     setSaveError(null);
     setStep('enroll2');
     setTimeout(() => setIsBiometricOpen(true), 300);
@@ -168,69 +178,71 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
     setIsBiometricOpen(false);
     toast.error(`Enrollment failed: ${reason}`);
     addLog(`Voice enrollment failed: ${reason}`, 'error');
-    // Allow retry
     if (step === 'enroll1') {
-      setIsBiometricOpen(true); // reopen for retry
+      setIsBiometricOpen(true);
     } else {
-      setStep('enroll1'); // go back to first sample
+      setStep('enroll1');
       setTimeout(() => setIsBiometricOpen(true), 400);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg bg-slate-900 border-slate-800 shadow-2xl relative rounded-[2.5rem] overflow-hidden">
+    <>
+    <FlowModalShell>
+      <Card className="w-full max-w-lg flex flex-col max-h-[min(92dvh,880px)] bg-slate-900 border-slate-800 shadow-2xl relative rounded-3xl overflow-hidden my-auto">
         <Button
           variant="ghost"
           size="icon"
           onClick={onComplete}
-          className="absolute top-6 right-6 text-slate-500 hover:text-white"
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 text-slate-500 hover:text-white z-20 shrink-0"
         >
           <X className="h-5 w-5" />
         </Button>
 
-        <CardHeader className="pt-10 text-center space-y-4">
-          <div className="mx-auto p-4 bg-blue-600/10 rounded-2xl border border-blue-500/20 w-fit">
-            <UserPlus className="h-8 w-8 text-blue-500" />
+        <CardHeader className="shrink-0 pt-8 pb-4 px-5 sm:px-8 text-center space-y-3 border-b border-slate-800/60">
+          <div className="mx-auto p-3 bg-blue-600/10 rounded-2xl border border-blue-500/20 w-fit">
+            <UserPlus className="h-7 w-7 sm:h-8 sm:w-8 text-blue-500" />
           </div>
           <div className="space-y-1">
-            <CardTitle className="text-2xl font-bold tracking-tight text-white">
+            <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight text-white">
               Biometric Enrollment
             </CardTitle>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
-              Secure Node Provisioning
+            <p className="text-slate-500 text-[10px] sm:text-xs font-semibold uppercase tracking-wider">
+              Secure node provisioning
             </p>
           </div>
 
-          {/* Step indicator */}
-          <div className="flex items-center justify-center gap-2 pt-2">
+          <div className="flex items-center justify-center pt-1 pb-0.5 max-w-full overflow-x-auto gap-0 px-1">
             {(['name', 'phrase', 'enroll1', 'enroll2'] as Step[]).map((s, i) => (
               <React.Fragment key={s}>
-                <div className="flex flex-col items-center gap-1">
+                {i > 0 && (
                   <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${
+                    className={`h-px w-3 sm:w-6 shrink-0 ${i <= currentStepIdx ? 'bg-emerald-500/45' : 'bg-slate-800'}`}
+                  />
+                )}
+                <div className="flex flex-col items-center gap-0.5 shrink-0 px-0.5">
+                  <div
+                    className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold transition-all ${
                       i < currentStepIdx
                         ? 'bg-emerald-500 text-white'
                         : i === currentStepIdx
-                        ? 'bg-blue-600 text-white ring-2 ring-blue-500/30'
-                        : 'bg-slate-800 text-slate-600'
+                          ? 'bg-blue-600 text-white ring-2 ring-blue-500/30'
+                          : 'bg-slate-800 text-slate-600'
                     }`}
                   >
                     {i < currentStepIdx ? '✓' : i + 1}
                   </div>
-                  <span className="text-[8px] text-slate-600 uppercase tracking-widest">
+                  <span className="text-[7px] sm:text-[8px] text-slate-500 uppercase tracking-tighter text-center leading-tight w-[3.25rem] sm:w-14">
                     {STEP_LABELS[s]}
                   </span>
                 </div>
-                {i < 3 && <div className={`flex-1 h-px max-w-[2rem] ${i < currentStepIdx ? 'bg-emerald-500/40' : 'bg-slate-800'}`} />}
               </React.Fragment>
             ))}
           </div>
         </CardHeader>
 
-        <CardContent className="pb-10 px-10">
+        <CardContent className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 sm:px-8 pb-6 sm:pb-8 pt-4">
           <AnimatePresence mode="wait">
-            {/* Step 1: Name */}
             {step === 'name' && (
               <motion.div
                 key="name"
@@ -238,31 +250,30 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
               >
-                <form onSubmit={handleNameSubmit} className="space-y-6">
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">
-                      Legal Identity Name
+                <form onSubmit={handleNameSubmit} className="space-y-4 sm:space-y-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 ml-0.5">
+                      Display name
                     </label>
                     <Input
                       value={userName}
                       onChange={(e) => setUserName(e.target.value)}
                       placeholder="e.g. Priya Sharma"
-                      className="bg-slate-800/50 border-slate-700 h-14 text-lg rounded-2xl focus:ring-blue-500/20"
+                      className="bg-slate-800/50 border-slate-700 h-11 sm:h-12 text-base rounded-xl focus:ring-blue-500/20"
                       autoFocus
                     />
                   </div>
                   <Button
                     type="submit"
                     disabled={!userName.trim()}
-                    className="w-full h-14 bg-blue-600 hover:bg-blue-500 font-bold text-lg rounded-2xl shadow-lg shadow-blue-900/20"
+                    className="w-full h-11 sm:h-12 bg-blue-600 hover:bg-blue-500 font-semibold text-base rounded-xl shadow-lg shadow-blue-900/20"
                   >
-                    Next: Choose Passphrase
+                    Next: choose passphrase
                   </Button>
                 </form>
               </motion.div>
             )}
 
-            {/* Step 2: Phrase */}
             {step === 'phrase' && (
               <motion.div
                 key="phrase"
@@ -270,94 +281,84 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
               >
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-slate-400 text-xs">
-                    <Languages className="w-4 h-4 text-blue-400" />
-                    <span>Choose a phrase in any language. You must say this exact phrase each time you authenticate.</span>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-2 text-slate-400 text-xs leading-relaxed">
+                    <Languages className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                    <span>Choose a phrase in any language. Say this exact phrase when you authenticate.</span>
                   </div>
                   <PhraseSelector onConfirm={handlePhraseConfirm} />
                 </div>
               </motion.div>
             )}
 
-            {/* Step 3/4: Recording spinner */}
             {(step === 'enroll1' || step === 'enroll2') && !isBiometricOpen && (
               <motion.div
                 key={step}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-center py-12 space-y-6"
+                className="text-center py-8 sm:py-10 space-y-4"
               >
-                <div className="relative w-20 h-20 mx-auto">
+                <div className="relative w-16 h-16 sm:w-20 sm:h-20 mx-auto">
                   <div className="absolute inset-0 border-4 border-blue-500/10 rounded-full" />
                   <div className="absolute inset-0 border-t-4 border-blue-500 rounded-full animate-spin" />
-                  <Mic className="absolute inset-0 m-auto h-8 w-8 text-blue-500" />
+                  <Mic className="absolute inset-0 m-auto h-6 w-6 sm:h-8 sm:w-8 text-blue-500" />
                 </div>
-                <div className="space-y-2">
-                  <p className="text-lg font-bold text-white">
-                    {step === 'enroll1' ? 'Preparing First Recording...' : 'Almost Done! One More Recording'}
+                <div className="space-y-1">
+                  <p className="text-base sm:text-lg font-semibold text-white">
+                    {step === 'enroll1' ? 'Preparing first recording…' : 'Almost done — one more sample'}
                   </p>
-                  <p className="text-sm text-slate-500 leading-relaxed">
+                  <p className="text-sm text-slate-500">
                     {step === 'enroll2'
-                      ? 'Two samples create a more reliable voice model.'
-                      : 'The secure capture modal will open shortly.'}
+                      ? 'Two samples build a more reliable voice model.'
+                      : 'The capture window will open in a moment.'}
                   </p>
                 </div>
               </motion.div>
             )}
 
-            {/* Step saving */}
             {step === 'saving' && (
               <motion.div
                 key="saving"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-center py-12 space-y-6"
+                className="text-center py-8 sm:py-10 space-y-4"
               >
-                <div className="relative w-20 h-20 mx-auto">
+                <div className="relative w-16 h-16 sm:w-20 sm:h-20 mx-auto">
                   <div className="absolute inset-0 border-4 border-emerald-500/10 rounded-full" />
                   <div className="absolute inset-0 border-t-4 border-emerald-500 rounded-full animate-spin" />
-                  <ShieldCheck className="absolute inset-0 m-auto h-8 w-8 text-emerald-500" />
+                  <ShieldCheck className="absolute inset-0 m-auto h-6 w-6 sm:h-8 sm:w-8 text-emerald-500" />
                 </div>
-                <div className="space-y-2">
-                  <p className="text-lg font-bold text-white">Synthesising Biometric Profile</p>
-                  <p className="text-sm text-slate-500">{saveProgress}</p>
+                <div className="space-y-1">
+                  <p className="text-base sm:text-lg font-semibold text-white">Saving your profile</p>
+                  <p className="text-sm text-slate-500 text-balance">{saveProgress}</p>
                 </div>
               </motion.div>
             )}
 
-            {/* Error state */}
             {step === 'error' && (
               <motion.div
                 key="error"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-center py-8 space-y-6"
+                className="text-center py-4 space-y-4"
               >
-                <div className="mx-auto p-4 bg-red-500/10 rounded-2xl border border-red-500/20 w-fit">
-                  <AlertTriangle className="h-8 w-8 text-red-400" />
+                <div className="mx-auto p-3 bg-red-500/10 rounded-2xl border border-red-500/20 w-fit">
+                  <AlertTriangle className="h-7 w-7 sm:h-8 sm:w-8 text-red-400" />
                 </div>
-                <div className="space-y-2">
-                  <p className="text-lg font-bold text-white">Enrollment Failed</p>
-                  <p className="text-sm text-red-400/80 break-words px-4">{saveError}</p>
-                  <p className="text-[11px] text-slate-500 mt-4">
-                    Tip: open the browser console (F12) for the full error.
-                    Common causes: network issue, Firestore rules, or the new account's email not yet verified.
+                <div className="space-y-2 text-left sm:text-center">
+                  <p className="text-base font-semibold text-white">Enrollment failed</p>
+                  <p className="text-sm text-red-400/90 break-words">{saveError}</p>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Tip: open the browser console (F12) for details. Common causes: Firestore rules, network, or
+                    permissions.
                   </p>
                 </div>
-                <div className="flex gap-3 justify-center pt-2">
-                  <Button
-                    onClick={handleRetrySave}
-                    className="bg-blue-600 hover:bg-blue-500 font-bold rounded-xl px-6"
-                  >
-                    Retry Recording
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={onComplete}
-                    className="text-slate-400 hover:text-white font-bold rounded-xl px-6"
-                  >
+                <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 justify-center pt-2">
+                  <Button variant="ghost" onClick={onComplete} className="text-slate-400 hover:text-white rounded-xl">
                     Cancel
+                  </Button>
+                  <Button onClick={handleRetrySave} className="bg-blue-600 hover:bg-blue-500 font-semibold rounded-xl">
+                    Retry
                   </Button>
                 </div>
               </motion.div>
@@ -365,8 +366,8 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
           </AnimatePresence>
         </CardContent>
       </Card>
+    </FlowModalShell>
 
-      {/* Biometric capture modals */}
       {isBiometricOpen && step === 'enroll1' && phraseSelection && (
         <BiometricModal
           action={{
@@ -398,7 +399,7 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
           onFailure={handleEnrollFailure}
         />
       )}
-    </div>
+    </>
   );
 };
 

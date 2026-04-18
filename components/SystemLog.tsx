@@ -1,6 +1,5 @@
 import React, { useRef, useEffect } from 'react';
 import { LogMessage } from '../types';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { Terminal, Activity, Globe } from 'lucide-react';
 import { format } from 'date-fns';
@@ -53,39 +52,36 @@ const SystemLog: React.FC<SystemLogProps> = ({ messages }) => {
   };
 
   return (
-    <Card className="bg-slate-900/40 border-slate-800/50 shadow-2xl rounded-[2rem] overflow-hidden flex flex-col h-[500px]">
-      <CardHeader className="p-6 border-b border-slate-800/50 bg-slate-900/60">
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
-            <Terminal className="h-4 w-4 text-blue-500" />
-            System Console
-          </CardTitle>
-          <Activity className="h-3.5 w-3.5 text-emerald-500 animate-pulse" />
+    <div className="rounded-2xl border border-slate-800/70 bg-slate-900/50 overflow-hidden flex flex-col h-[min(320px,36vh)] md:h-[min(360px,40vh)]">
+      <div className="px-5 py-4 border-b border-slate-800/60 flex items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+            <Terminal className="h-4 w-4 text-blue-400" />
+            Console
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">App messages and diagnostics</p>
         </div>
-      </CardHeader>
-      <CardContent className="p-0 flex-grow">
+        <Activity className="h-3.5 w-3.5 text-emerald-500/80 animate-pulse shrink-0" />
+      </div>
+      <div className="p-0 flex-1 min-h-0">
         <ScrollArea className="h-full">
-          <div className="p-6 font-mono text-[11px] space-y-4">
+          <div className="p-4 font-mono text-[12px] leading-relaxed space-y-3">
             {messages.length === 0 ? (
-              <div className="text-center py-20 text-slate-700">
-                <p className="uppercase tracking-widest">Awaiting System Feed...</p>
-              </div>
+              <div className="text-center py-14 text-slate-600 text-sm">No messages yet</div>
             ) : (
               messages.map((msg, index) => (
-                <div key={msg.id || index} className={`flex items-start gap-4 ${getLogStyle(msg.type)}`}>
-                  <div className="flex flex-col items-end min-w-[60px] opacity-40">
-                    <span>
-                      {(() => {
-                        const date = toValidDate(msg.timestamp);
-                        return date ? format(date, 'HH:mm:ss') : '--:--:--';
-                      })()}
-                    </span>
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <p className="leading-relaxed">{msg.text}</p>
+                <div key={msg.id || index} className={`flex items-start gap-3 ${getLogStyle(msg.type)}`}>
+                  <span className="min-w-[52px] shrink-0 text-slate-600 text-[11px] tabular-nums">
+                    {(() => {
+                      const date = toValidDate(msg.timestamp);
+                      return date ? format(date, 'HH:mm:ss') : '—';
+                    })()}
+                  </span>
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <p>{msg.text}</p>
                     {msg.location && (
-                      <div className="flex items-center gap-1 text-[9px] opacity-30 uppercase font-black tracking-tighter">
-                        <Globe className="w-2 h-2" />
+                      <div className="flex items-center gap-1 text-[10px] text-slate-600">
+                        <Globe className="w-3 h-3 shrink-0" />
                         {msg.location}
                       </div>
                     )}
@@ -96,8 +92,8 @@ const SystemLog: React.FC<SystemLogProps> = ({ messages }) => {
             <div ref={endOfMessagesRef} />
           </div>
         </ScrollArea>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 

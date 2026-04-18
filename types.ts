@@ -60,6 +60,28 @@ export interface LogMessage {
   userName?: string;
 }
 
+/** Immutable security / audit trail entries (per user). */
+export type SecurityAuditAction =
+  | 'LOGIN_SUCCESS'
+  | 'LOGOUT'
+  | 'ENROLL_COMPLETE'
+  | 'FILE_ENCRYPT'
+  | 'FILE_DECRYPT'
+  | 'MAGIC_LINK_SENT'
+  | 'ACCOUNT_DELETE_SELF';
+
+export interface UserSecurityEvent {
+  id?: string;
+  userId: string;
+  action: SecurityAuditAction | string;
+  summary: string;
+  metadata?: Record<string, string>;
+  userEmail?: string;
+  displayName?: string;
+  userAgent?: string;
+  createdAt?: string | { toDate?: () => Date; seconds?: number };
+}
+
 export interface LoginHistoryEntry {
   id?: string;
   userUid: string;

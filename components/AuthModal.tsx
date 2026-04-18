@@ -23,11 +23,12 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   signInWithPhoneNumber,
+  sendSignInLinkToEmail,
   RecaptchaVerifier,
   ConfirmationResult,
 } from 'firebase/auth';
 
-type Mode = 'signin' | 'signup' | 'phone';
+type Mode = 'signin' | 'signup' | 'phone' | 'magiclink';
 type PhoneStep = 'enter-number' | 'enter-code';
 
 const friendlyError = (code: string | undefined, fallback: string) => {
@@ -90,6 +91,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onBackToIntro }) => {
   const [phoneStep, setPhoneStep] = useState<PhoneStep>('enter-number');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otpCode, setOtpCode] = useState('');
+  const [magicLinkEmail, setMagicLinkEmail] = useState('');
   const recaptchaContainerRef = useRef<HTMLDivElement>(null);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const recaptchaSlotRef = useRef<HTMLDivElement | null>(null);
@@ -153,11 +155,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ onBackToIntro }) => {
     return verifier;
   };
 
+  const signInContinueUrl = () =>
+    new URL(import.meta.env.BASE_URL || '/', window.location.origin).href;
+
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true);
     setError('');
     setInfo('');
     try {
+      sessionStorage.setItem('vas_last_auth_method', 'google');
       await signInWithPopup(auth, googleProvider);
     } catch (err: any) {
       if (
@@ -188,11 +194,13 @@ const AuthModal: React.FC<AuthModalProps> = ({ onBackToIntro }) => {
     setIsLoading(true);
     try {
       if (mode === 'signup') {
+        sessionStorage.setItem('vas_last_auth_method', 'email_password_signup');
         const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
         if (displayName.trim()) {
           await updateProfile(cred.user, { displayName: displayName.trim() });
         }
       } else {
+        sessionStorage.setItem('vas_last_auth_method', 'email_password');
         await signInWithEmailAndPassword(auth, email.trim(), password);
       }
     } catch (err: any) {
@@ -264,6 +272,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onBackToIntro }) => {
 
     setIsLoading(true);
     try {
+      sessionStorage.setItem('vas_last_auth_method', 'sms_otp');
       await confirmationResultRef.current.confirm(code);
       // onAuthStateChanged in App.tsx will handle state update
     } catch (err: any) {
@@ -282,15 +291,42 @@ const AuthModal: React.FC<AuthModalProps> = ({ onBackToIntro }) => {
     teardownRecaptcha();
   };
 
+  const handleSendMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setInfo('');
+    const em = magicLinkEmail.trim();
+    if (!em) {
+      setError('Enter your email address.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await sendSignInLinkToEmail(auth, em, {
+        url: signInContinueUrl(),
+        handleCodeInApp: true,
+      });
+      localStorage.setItem('emailForSignIn', em);
+      setInfo(
+        'Sign-in link sent. Open it in this same browser. Check spam if you do not see it within a minute.'
+      );
+    } catch (err: any) {
+      setError(friendlyError(err?.code, err?.message || 'Could not send link.'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const switchMode = (next: Mode) => {
     setMode(next);
     setError('');
     setInfo('');
     if (next !== 'phone') resetPhoneFlow();
+    if (next !== 'magiclink') setMagicLinkEmail('');
   };
 
   return (
-    <div className="fixed inset-0 bg-[#020617] z-[200] flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[200] overflow-y-auto overscroll-contain bg-[#020617]">
       {/* Ambient glows */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px]" />
@@ -298,11 +334,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ onBackToIntro }) => {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-blue-900/5 rounded-full blur-[180px]" />
       </div>
 
+      <div className="flex min-h-[100dvh] w-full items-center justify-center p-3 sm:p-4 py-8">
       <motion.div
         initial={{ opacity: 0, y: 24, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
-        className="w-full max-w-md bg-slate-900/60 backdrop-blur-2xl border border-slate-800 p-8 rounded-[2.5rem] shadow-2xl text-center space-y-6 relative z-10 my-8"
+        className="w-full max-w-md max-h-[min(92dvh,880px)] overflow-y-auto overscroll-contain bg-slate-900/60 backdrop-blur-2xl border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl text-center space-y-6 relative z-10 my-auto"
       >
         {onBackToIntro && (
           <button
@@ -337,13 +374,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ onBackToIntro }) => {
             {mode === 'signup' && 'Create an account to get started.'}
             {mode === 'phone' &&
               (phoneStep === 'enter-number'
-                ? 'Receive a one-time code via SMS.'
-                : 'Enter the code we texted you.')}
+                ? 'SMS OTP: Firebase sends a one-time code to your phone (enable Phone provider in Firebase Console).'
+                : 'Enter the code from your SMS.')}
+            {mode === 'magiclink' &&
+              'Passwordless: we email you a secure link. Same browser recommended after you click it.'}
           </p>
         </div>
 
         {/* Mode tabs */}
-        <div className="grid grid-cols-3 p-1 bg-slate-800/40 border border-slate-800 rounded-2xl text-[10px] font-bold uppercase tracking-widest">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1 bg-slate-800/40 border border-slate-800 rounded-2xl text-[9px] sm:text-[10px] font-bold uppercase tracking-tight sm:tracking-widest">
           <button
             type="button"
             onClick={() => switchMode('signin')}
@@ -353,7 +392,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onBackToIntro }) => {
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            Sign In
+            Sign in
           </button>
           <button
             type="button"
@@ -364,7 +403,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onBackToIntro }) => {
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            Create
+            Register
           </button>
           <button
             type="button"
@@ -375,8 +414,20 @@ const AuthModal: React.FC<AuthModalProps> = ({ onBackToIntro }) => {
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <Phone className="w-3 h-3" />
-            OTP
+            <Phone className="w-3 h-3 shrink-0" />
+            <span className="truncate">SMS OTP</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode('magiclink')}
+            className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1 ${
+              mode === 'magiclink'
+                ? 'bg-slate-900 text-white shadow'
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            <Mail className="w-3 h-3 shrink-0" />
+            <span className="truncate">Email link</span>
           </button>
         </div>
 
@@ -500,6 +551,48 @@ const AuthModal: React.FC<AuthModalProps> = ({ onBackToIntro }) => {
                 </>
               ) : (
                 <span>{mode === 'signup' ? 'Create Account' : 'Sign In'}</span>
+              )}
+            </button>
+          </form>
+        )}
+
+        {/* Email magic link */}
+        {mode === 'magiclink' && (
+          <form onSubmit={handleSendMagicLink} className="space-y-3 text-left">
+            <label className="block">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                Email
+              </span>
+              <div className="mt-1.5 relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  type="email"
+                  value={magicLinkEmail}
+                  onChange={(e) => setMagicLinkEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  autoComplete="email"
+                  required
+                  className="w-full h-11 pl-10 pr-3 bg-slate-950/60 border border-slate-800 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 transition"
+                />
+              </div>
+            </label>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Uses Firebase Email link (passwordless). Add your domain under Authentication → Settings → Authorized
+              domains. For GitHub Pages, authorize <span className="text-slate-400">*.github.io</span> or your custom
+              domain.
+            </p>
+            <button
+              type="submit"
+              disabled={isLoading || isGoogleLoading}
+              className="w-full h-12 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-blue-900/30"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Sending link…</span>
+                </>
+              ) : (
+                <span>Send sign-in link</span>
               )}
             </button>
           </form>
@@ -668,6 +761,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onBackToIntro }) => {
           </div>
         </div>
       </motion.div>
+      </div>
     </div>
   );
 };

@@ -9,6 +9,7 @@ import {
 } from '../utils/audioProcessor';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShieldCheck, Mic, Loader2, AlertCircle, Globe, CheckCircle2 } from 'lucide-react';
+import FlowModalShell from './FlowModalShell';
 
 interface BiometricModalProps {
   action: AuthAction;
@@ -276,11 +277,11 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
   const waveformBars = Array.from({ length: 9 });
 
   return (
-    <div className="fixed inset-0 bg-slate-950/90 z-[250] flex items-center justify-center p-4 backdrop-blur-xl">
+    <FlowModalShell layer="biometric" backdrop="darker">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-slate-900 border border-slate-800 rounded-[2.5rem] shadow-2xl w-full max-w-lg p-10 relative overflow-hidden"
+        className="bg-slate-900 border border-slate-800 rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl w-full max-w-lg max-h-[min(92dvh,900px)] overflow-y-auto overscroll-contain p-6 sm:p-10 relative my-auto"
       >
         {/* Ambient glow */}
         <div
@@ -292,8 +293,9 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
         />
 
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-8 right-8 text-slate-500 hover:text-white transition-colors z-10"
+          className="absolute top-4 right-4 sm:top-8 sm:right-8 text-slate-500 hover:text-white transition-colors z-10"
         >
           <X className="h-6 w-6" />
         </button>
@@ -488,7 +490,7 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
           to { transform: scaleY(1.2); }
         }
       `}</style>
-    </div>
+    </FlowModalShell>
   );
 };
 

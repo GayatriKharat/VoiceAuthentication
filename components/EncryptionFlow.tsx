@@ -17,6 +17,9 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import FlowModalShell from './FlowModalShell';
+import { auth, db } from '../firebase';
+import { recordSecurityEvent } from '../utils/securityAudit';
 
 type Step =
   | 'uploadFile'
@@ -179,6 +182,16 @@ const EncryptionFlow: React.FC<EncryptionFlowProps> = ({
         location: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
 
+      if (auth.currentUser) {
+        await recordSecurityEvent(
+          db,
+          auth.currentUser,
+          'FILE_ENCRYPT',
+          `Encrypted “${fileToEncrypt.name}” for ${recipients.length} recipient(s).`,
+          { fileName: fileToEncrypt.name, recipients: String(recipients.length) }
+        );
+      }
+
       addLog(
         `File '${fileToEncrypt.name}' encrypted by ${sender.name} for: ${recipients
           .map((r) => r.name)
@@ -207,17 +220,17 @@ const EncryptionFlow: React.FC<EncryptionFlowProps> = ({
 
   if (!currentUserProfile) {
     return (
-      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-        <Card className="w-full max-w-md bg-slate-900 border-slate-800 shadow-2xl relative rounded-[2.5rem]">
+      <FlowModalShell>
+        <Card className="w-full max-w-md bg-slate-900 border-slate-800 shadow-2xl relative rounded-3xl my-auto">
           <Button
             variant="ghost"
             size="icon"
             onClick={onComplete}
-            className="absolute top-6 right-6 text-slate-500 hover:text-white"
+            className="absolute top-4 right-4 text-slate-500 hover:text-white"
           >
             <X className="h-5 w-5" />
           </Button>
-          <CardContent className="p-10 text-center space-y-4">
+          <CardContent className="p-8 text-center space-y-4">
             <AlertCircle className="h-10 w-10 text-amber-400 mx-auto" />
             <h3 className="text-xl font-bold text-white">Enrollment Required</h3>
             <p className="text-slate-400 text-sm">
@@ -231,23 +244,24 @@ const EncryptionFlow: React.FC<EncryptionFlowProps> = ({
             </Button>
           </CardContent>
         </Card>
-      </div>
+      </FlowModalShell>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto">
-      <Card className="w-full max-w-lg bg-slate-900 border-slate-800 shadow-2xl relative rounded-[2.5rem] overflow-hidden my-8">
+    <>
+      <FlowModalShell>
+        <Card className="w-full max-w-lg flex flex-col max-h-[min(92dvh,900px)] bg-slate-900 border-slate-800 shadow-2xl relative rounded-3xl overflow-hidden my-auto">
         <Button
           variant="ghost"
           size="icon"
           onClick={onComplete}
-          className="absolute top-6 right-6 text-slate-500 hover:text-white z-10"
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 text-slate-500 hover:text-white z-10"
         >
           <X className="h-5 w-5" />
         </Button>
 
-        <CardHeader className="pt-10 text-center space-y-4">
+        <CardHeader className="shrink-0 pt-8 pb-4 px-5 sm:px-8 text-center space-y-3 border-b border-slate-800/60">
           <div className="mx-auto p-4 bg-indigo-600/10 rounded-2xl border border-indigo-500/20 w-fit">
             <Lock className="h-8 w-8 text-indigo-500" />
           </div>
@@ -261,7 +275,7 @@ const EncryptionFlow: React.FC<EncryptionFlowProps> = ({
           </div>
         </CardHeader>
 
-        <CardContent className="pb-10 px-10">
+        <CardContent className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 sm:px-8 pb-6 sm:pb-8 pt-4">
           <AnimatePresence mode="wait">
             {/* Step 1: Upload File */}
             {step === 'uploadFile' && (
@@ -274,7 +288,7 @@ const EncryptionFlow: React.FC<EncryptionFlowProps> = ({
               >
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="group relative cursor-pointer border-2 border-dashed border-slate-800 rounded-3xl p-12 transition-all hover:border-indigo-500/50 hover:bg-indigo-500/5 flex flex-col items-center justify-center text-center space-y-4 shadow-inner"
+                  className="group relative cursor-pointer border-2 border-dashed border-slate-800 rounded-2xl sm:rounded-3xl p-8 sm:p-12 transition-all hover:border-indigo-500/50 hover:bg-indigo-500/5 flex flex-col items-center justify-center text-center space-y-4 shadow-inner"
                 >
                   <input
                     type="file"
@@ -528,8 +542,8 @@ const EncryptionFlow: React.FC<EncryptionFlowProps> = ({
           </AnimatePresence>
         </CardContent>
       </Card>
+      </FlowModalShell>
 
-      {/* Biometric verification modal — the sender's own voice authorizes the send */}
       {isBiometricModalOpen && currentUserProfile && (
         <BiometricModal
           action={{ type: 'verify', user: currentUserProfile }}
@@ -538,7 +552,7 @@ const EncryptionFlow: React.FC<EncryptionFlowProps> = ({
           onFailure={handleAuthFailure}
         />
       )}
-    </div>
+    </>
   );
 };
 

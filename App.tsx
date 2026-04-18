@@ -13,9 +13,17 @@ import AuthModal from './components/AuthModal';
 import LoginHistoryPanel from './components/LoginHistoryPanel';
 import AccountPanel from './components/AccountPanel';
 import LandingPage from './components/LandingPage';
+import DashboardHero from './components/DashboardHero';
+import SecurityActivityPanel from './components/SecurityActivityPanel';
 import { Toaster, toast } from 'sonner';
-import { auth, db, handleFirestoreError, OperationType } from './firebase';
-import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
+import { auth, db, handleFirestoreError, OperationType, requestLoginDigestEmail } from './firebase';
+import {
+  onAuthStateChanged,
+  signOut,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
+  User as FirebaseUser,
+} from 'firebase/auth';
 import {
   collection,
   onSnapshot,
@@ -28,8 +36,8 @@ import {
   deleteDoc,
 } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Globe, ShieldCheck } from 'lucide-react';
 import { getLocationInfo } from './utils/locationService';
+import { recordSecurityEvent } from './utils/securityAudit';
 
 const MAX_USERS = 50;
 
@@ -49,6 +57,37 @@ const App: React.FC = () => {
 
   // Prevent duplicate login session logging per browser tab
   const sessionLoggedRef = useRef(false);
+  const emailLinkHandledRef = useRef(false);
+
+  // ---------------------------------------------------------------
+  // Email magic link completion (passwordless) — same tab as send
+  // ---------------------------------------------------------------
+  useEffect(() => {
+    if (typeof window === 'undefined' || emailLinkHandledRef.current) return;
+    const href = window.location.href;
+    if (!isSignInWithEmailLink(auth, href)) return;
+
+    emailLinkHandledRef.current = true;
+    const email = localStorage.getItem('emailForSignIn');
+    if (!email) {
+      console.warn('Email link sign-in: missing emailForSignIn');
+      emailLinkHandledRef.current = false;
+      return;
+    }
+
+    (async () => {
+      try {
+        sessionStorage.setItem('vas_last_auth_method', 'email_magic_link');
+        await signInWithEmailLink(auth, email, href);
+        localStorage.removeItem('emailForSignIn');
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+      } catch (e) {
+        console.error('Email link sign-in failed:', e);
+        emailLinkHandledRef.current = false;
+        toast.error('Sign-in link invalid or expired. Request a new one.');
+      }
+    })();
+  }, []);
 
   // ---------------------------------------------------------------
   // Auth Listener
@@ -112,6 +151,17 @@ const App: React.FC = () => {
           displayName: location.displayName,
         });
         sessionStorage.setItem('vas_session_uid', currentUser.uid);
+
+        const method = sessionStorage.getItem('vas_last_auth_method') ?? 'unknown';
+        sessionStorage.removeItem('vas_last_auth_method');
+        await recordSecurityEvent(
+          db,
+          currentUser,
+          'LOGIN_SUCCESS',
+          `Signed in successfully (${method.replace(/_/g, ' ')}). ${location.city ? `Approx. location: ${location.city}.` : ''}`,
+          { method, timezone: location.timezone ?? '' }
+        );
+        await requestLoginDigestEmail();
       } catch (error) {
         console.warn('Could not log session location:', error);
       }
@@ -246,6 +296,15 @@ const App: React.FC = () => {
 
     const performDelete = async () => {
       try {
+        if (isSelf && currentUser) {
+          await recordSecurityEvent(
+            db,
+            currentUser,
+            'ACCOUNT_DELETE_SELF',
+            'User removed their enrollment from the workspace.',
+            {}
+          );
+        }
         await deleteDoc(doc(db, 'users', userUid));
         addLog(
           isSelf
@@ -329,86 +388,45 @@ const App: React.FC = () => {
     );
   }
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = async () => {
+    const u = auth.currentUser;
+    if (u) {
+      await recordSecurityEvent(db, u, 'LOGOUT', 'User signed out from this browser.', {});
+    }
+    await signOut(auth);
+  };
+
+  const regionLabel =
+    loginSessions[0]?.city && loginSessions[0].city !== 'Unknown'
+      ? loginSessions[0].city
+      : loginSessions[0]?.timezone?.split('/')[1]?.replace(/_/g, ' ') || '—';
 
   // ---------------------------------------------------------------
   // Main UI
   // ---------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-200 font-sans selection:bg-blue-500/30">
+    <div className="min-h-screen bg-[#020617] text-slate-200 font-sans selection:bg-blue-500/30 relative overflow-x-hidden">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
+        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-blue-600/15 blur-3xl" />
+        <div className="absolute top-1/2 -left-32 h-96 w-96 rounded-full bg-indigo-600/10 blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 h-64 w-64 rounded-full bg-cyan-500/5 blur-3xl" />
+      </div>
+
       <Header user={currentUser} onLogout={handleLogout} />
 
-      <main className="container mx-auto max-w-7xl px-4 md:px-8 py-6 md:py-10 space-y-10">
-        {/* Step 3 — Dashboard header */}
-        <section className="space-y-4">
-          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
-            Step 3 · Dashboard
-          </p>
-          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 border-b border-slate-800/80 pb-8">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-blue-400 text-xs font-bold uppercase tracking-widest">
-                <Globe className="w-3 h-3" />
-                <span>Your workspace</span>
-              </div>
-              <h2 className="text-2xl md:text-3xl font-light tracking-tight text-white">
-                Welcome,{' '}
-                <span className="font-bold text-blue-500">{currentUser.displayName || 'Operator'}</span>
-              </h2>
-              <p className="text-sm text-slate-400 max-w-xl">
-                One place to enroll your voice, protect files for your team, and open only what you are allowed to.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-6 px-5 py-3 bg-slate-900/60 rounded-2xl border border-slate-800">
-                <div>
-                  <div className="text-[10px] text-slate-500 uppercase font-bold">Team</div>
-                  <div className="text-lg font-mono text-white">{users.length}</div>
-                </div>
-                <div className="w-px h-10 bg-slate-800" />
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                  <div>
-                    <div className="text-[10px] text-slate-500 uppercase font-bold">Status</div>
-                    <div className="text-sm font-semibold text-emerald-400">Protected</div>
-                  </div>
-                </div>
-                <div className="w-px h-10 bg-slate-800 hidden sm:block" />
-                <div className="hidden sm:block">
-                  <div className="text-[10px] text-slate-500 uppercase font-bold">Region</div>
-                  <div className="text-sm font-mono text-blue-400 max-w-[140px] truncate">
-                    {loginSessions[0]?.city && loginSessions[0].city !== 'Unknown'
-                      ? loginSessions[0].city
-                      : loginSessions[0]?.timezone?.split('/')[1]?.replace(/_/g, ' ') || '—'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Quick guide — single strip */}
-        <section className="rounded-2xl border border-slate-800/70 bg-gradient-to-br from-slate-900/80 to-slate-950/80 p-5 md:p-6">
-          <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3">
-            How it works
-          </h3>
-          <ol className="text-sm text-slate-300 space-y-2 list-decimal list-inside md:flex md:gap-8 md:list-none md:space-y-0">
-            <li className="md:flex-1">
-              <span className="font-semibold text-white">Enroll</span> — record your voice once.
-            </li>
-            <li className="md:flex-1">
-              <span className="font-semibold text-white">Encrypt</span> — choose who may decrypt.
-            </li>
-            <li className="md:flex-1">
-              <span className="font-semibold text-white">Decrypt</span> — voice check + permission.
-            </li>
-          </ol>
-        </section>
+      <main className="relative container mx-auto max-w-7xl px-4 md:px-8 py-6 md:py-9 space-y-8">
+        <DashboardHero
+          displayName={currentUser.displayName}
+          teamCount={users.length}
+          regionLabel={regionLabel}
+        />
 
         {/* Primary actions */}
         <section className="space-y-4">
-          <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
-            Choose an action
-          </h3>
+          <div>
+            <h3 className="text-lg font-semibold text-white tracking-tight">What do you want to do?</h3>
+            <p className="text-sm text-slate-500 mt-1">Pick a step — you can come back to this hub anytime.</p>
+          </div>
           <FileActions
             onStartEnrollment={() => setActiveFlow('enroll')}
             onStartEncryption={() => setActiveFlow('encrypt')}
@@ -416,13 +434,14 @@ const App: React.FC = () => {
           />
         </section>
 
-        {/* Account + Global registry — side by side on large screens */}
+        {/* Account + team */}
         <section className="space-y-4">
-          <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
-            Your account & team
-          </h3>
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-            <div className="xl:col-span-4 space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold text-white tracking-tight">Account & team</h3>
+            <p className="text-sm text-slate-500 mt-1">Your profile and enrolled people in this workspace.</p>
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
+            <div className="xl:col-span-4 min-w-0">
               <AccountPanel
                 currentUser={currentUser}
                 userProfile={userProfile}
@@ -442,31 +461,25 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        {/* Login history — full width, below */}
-        <section className="space-y-4 max-w-4xl">
-          <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
-            Recent sign-ins (this device)
-          </h3>
+        {/* Sign-ins */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start max-w-6xl">
           <LoginHistoryPanel sessions={loginSessions} />
+          <SecurityActivityPanel userUid={currentUser.uid} />
         </section>
 
-        {/* Optional technical feed — bottom */}
-        <section className="space-y-4 pt-2 border-t border-slate-800/60">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        {/* Optional audit */}
+        <section className="space-y-4 pt-4 border-t border-slate-800/50">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
-                Activity & diagnostics
-              </h3>
-              <p className="text-xs text-slate-600 mt-1">
-                File audit trail and system messages — optional; keep closed for a cleaner view.
-              </p>
+              <h3 className="text-lg font-semibold text-white tracking-tight">Audit & console</h3>
+              <p className="text-sm text-slate-500 mt-1">File events and system log — hidden by default.</p>
             </div>
             <button
               type="button"
               onClick={() => setShowSecurityFeed((s) => !s)}
-              className="shrink-0 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold border border-slate-700 transition-all"
+              className="shrink-0 px-4 py-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-sm font-medium border border-slate-700/80 transition-colors"
             >
-              {showSecurityFeed ? 'Hide details' : 'Show audit & console'}
+              {showSecurityFeed ? 'Hide' : 'Show'}
             </button>
           </div>
           <AnimatePresence>
