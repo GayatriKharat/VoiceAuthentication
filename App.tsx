@@ -12,6 +12,7 @@ import EncryptionFlow from './components/EncryptionFlow';
 import DecryptionFlow from './components/DecryptionFlow';
 import AuthModal from './components/AuthModal';
 import LoginHistoryPanel from './components/LoginHistoryPanel';
+import AccountPanel from './components/AccountPanel';
 import { Toaster, toast } from 'sonner';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
@@ -371,6 +372,12 @@ const App: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Left: User Registry */}
           <div className="lg:col-span-4 space-y-8">
+            <AccountPanel
+              currentUser={currentUser}
+              userProfile={userProfile}
+              onDeleteMyAccount={() => handleDeleteUser(currentUser.uid)}
+              onLogout={handleLogout}
+            />
             <UserPanel
               users={users}
               onDeleteUser={handleDeleteUser}
