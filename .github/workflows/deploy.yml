@@ -31,10 +31,11 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        # Use `npm install` instead of `npm ci` because the lockfile was
-        # generated on Windows and may be missing Linux-only optional deps
-        # (e.g. @rollup/rollup-linux-x64-gnu), which makes `npm ci` fail.
-        run: npm install --no-audit --no-fund
+        # `npm install` (not `npm ci`) because lockfile was generated on
+        # Windows and may miss Linux-only optional deps (e.g. @rollup/rollup-linux-x64-gnu).
+        # `--legacy-peer-deps` because eslint@10 and eslint-plugin-react-hooks@7
+        # have conflicting peer ranges; we don't actually run lint in CI so it's safe.
+        run: npm install --no-audit --no-fund --legacy-peer-deps
 
       - name: Setup Pages
         id: pages
