@@ -1,0 +1,7 @@
+{
+  "name": "Voice Authentication System",
+  "description": "A system that uses voice authentication for OS-level actions like opening and sharing encrypted files. This project demonstrates a user-friendly interface for managing users, files, and the voice authentication process.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

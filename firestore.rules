@@ -1,0 +1,123 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Data Model
+    // ===============================================================
+    //
+    // Collection: users / {userId}
+    //   uid, name, email, isEnrolled, voiceprint[], role, createdAt,
+    //   location?, passPhrase?, passPhraseLanguage?, passPhraseLanguageCode?
+    //
+    // Collection: file_history / {historyId}  (auto-ID via addDoc)
+    //   fileName, operation, userUid, userName, status, timestamp, location?
+    //   NOTE: `id` is NOT in the document data (it's the Firestore doc ID)
+    //
+    // Collection: system_logs / {logId}
+    //   text, type, timestamp, userUid?, userName?, location?
+    //
+    // Collection: login_history / {userId} / sessions / {sessionId}
+    //   userUid, userName, userEmail, timestamp, city?, region?,
+    //   country?, timezone, lat?, lon?, displayName?
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "gayatrikharat62@gmail.com" &&
+           request.auth.token.email_verified == true)
+        );
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+             email.matches("^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'isEnrolled', 'role', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'user'] &&
+             data.isEnrolled is bool;
+    }
+
+    // FIXED: Removed 'id' from required fields — addDoc auto-generates the document ID,
+    // it is NOT present in request.resource.data.
+    function isValidFileAction(data) {
+      return data.keys().hasAll(['fileName', 'operation', 'userUid', 'userName', 'status', 'timestamp']) &&
+             data.fileName is string && data.fileName.size() > 0 && data.fileName.size() < 255 &&
+             data.operation in ['encrypt', 'decrypt'] &&
+             data.status in ['success', 'failed'] &&
+             data.userUid == request.auth.uid;
+    }
+
+    function isValidSystemLog(data) {
+      return data.keys().hasAll(['text', 'type', 'timestamp']) &&
+             data.text is string && data.text.size() > 0 && data.text.size() < 1000 &&
+             data.type in ['info', 'success', 'error', 'warning'];
+    }
+
+    function isValidLoginSession(data) {
+      return data.keys().hasAll(['userUid', 'userEmail', 'timestamp', 'timezone']) &&
+             data.userUid == request.auth.uid &&
+             data.userEmail == request.auth.token.email &&
+             data.timezone is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) &&
+                       isValidUser(request.resource.data) &&
+                       (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isOwner(userId) &&
+                       isValidUser(request.resource.data) &&
+                       (request.resource.data.role == resource.data.role || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /file_history/{historyId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidFileAction(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    match /system_logs/{logId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidSystemLog(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    // Login history: each user can read/write only their own sessions
+    match /login_history/{userId}/sessions/{sessionId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidLoginSession(request.resource.data);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Public connection test document (read-only)
+    match /system/connection_test {
+      allow read: if true;
+    }
+  }
+}

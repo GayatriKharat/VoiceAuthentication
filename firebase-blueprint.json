@@ -1,0 +1,62 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Biometric user profile with voiceprint data",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "isEnrolled": { "type": "boolean" },
+        "voiceprint": { "type": "array", "items": { "type": "number" }, "description": "Serialized Float32Array" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "location": { "type": "string", "description": "Geographic location of enrollment" }
+      },
+      "required": ["uid", "name", "email", "isEnrolled", "role", "createdAt"]
+    },
+    "FileAction": {
+      "title": "File Action History",
+      "description": "Audit log for encryption and decryption events",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fileName": { "type": "string" },
+        "operation": { "type": "string", "enum": ["encrypt", "decrypt"] },
+        "userUid": { "type": "string" },
+        "userName": { "type": "string" },
+        "status": { "type": "string", "enum": ["success", "failed"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "location": { "type": "string" }
+      },
+      "required": ["id", "fileName", "operation", "userUid", "userName", "status", "timestamp"]
+    },
+    "SystemLog": {
+      "title": "System Log",
+      "description": "Global system events for monitoring",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "success", "error", "warning"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "location": { "type": "string" }
+      },
+      "required": ["text", "type", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Individual user profiles"
+    },
+    "/file_history/{historyId}": {
+      "schema": "FileAction",
+      "description": "Global audit trail of file actions"
+    },
+    "/system_logs/{logId}": {
+      "schema": "SystemLog",
+      "description": "Global system events"
+    }
+  }
+}
