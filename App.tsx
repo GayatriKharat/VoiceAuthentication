@@ -319,7 +319,14 @@ const App: React.FC = () => {
         </>
       );
     }
-    return <AuthModal />;
+    return (
+      <AuthModal
+        onBackToIntro={() => {
+          localStorage.removeItem('vas_seen_intro');
+          setShowLanding(true);
+        }}
+      />
+    );
   }
 
   const handleLogout = () => signOut(auth);
@@ -331,113 +338,153 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-[#020617] text-slate-200 font-sans selection:bg-blue-500/30">
       <Header user={currentUser} onLogout={handleLogout} />
 
-      <main className="container mx-auto p-4 md:p-8 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-800 pb-6">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-blue-400 text-xs font-bold uppercase tracking-widest">
-              <Globe className="w-3 h-3" />
-              <span>Secure Collaboration Workspace</span>
-            </div>
-            <h2 className="text-3xl font-light tracking-tight text-white">
-              Welcome back, <span className="font-bold text-blue-500">{currentUser.displayName || 'Operator'}</span>
-            </h2>
-            <p className="text-sm text-slate-400">
-              Enroll your voice, encrypt for selected teammates, and decrypt only if authorized.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center gap-8 px-6 py-3 bg-slate-900/50 rounded-2xl border border-slate-800">
-              <div className="text-center">
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">
-                  Team Members
-                </div>
-                <div className="text-xl font-mono text-white">{users.length}</div>
+      <main className="container mx-auto max-w-7xl px-4 md:px-8 py-6 md:py-10 space-y-10">
+        {/* Step 3 — Dashboard header */}
+        <section className="space-y-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
+            Step 3 · Dashboard
+          </p>
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 border-b border-slate-800/80 pb-8">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-blue-400 text-xs font-bold uppercase tracking-widest">
+                <Globe className="w-3 h-3" />
+                <span>Your workspace</span>
               </div>
-              <div className="w-px h-8 bg-slate-800" />
-              <div className="text-center">
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">
-                  Security Status
-                </div>
-                <div className="text-xl font-mono text-emerald-400 flex items-center gap-1">
-                  <ShieldCheck className="w-4 h-4" />
-                  Active
-                </div>
-              </div>
-              <div className="w-px h-8 bg-slate-800" />
-              <div className="text-center">
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">
-                  Your Location
-                </div>
-                <div className="text-sm font-mono text-blue-400 max-w-[120px] truncate">
-                  {loginSessions[0]?.city && loginSessions[0].city !== 'Unknown'
-                    ? `${loginSessions[0].city}`
-                    : loginSessions[0]?.timezone?.split('/')[1]?.replace(/_/g, ' ') || '—'}
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowSecurityFeed((s) => !s)}
-              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-all shadow-lg shadow-blue-900/20"
-            >
-              {showSecurityFeed ? 'Hide Security Feed' : 'Show Security Feed'}
-            </button>
-          </div>
-        </div>
-
-        <AnimatePresence>
-          {showSecurityFeed && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <FileHistoryPanel history={fileHistory} />
-                <SystemLog messages={logMessages} />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <FileActions
-          onStartEnrollment={() => setActiveFlow('enroll')}
-          onStartEncryption={() => setActiveFlow('encrypt')}
-          onStartDecryption={() => setActiveFlow('decrypt')}
-        />
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-5 space-y-8">
-            <AccountPanel
-              currentUser={currentUser}
-              userProfile={userProfile}
-              onDeleteMyAccount={() => handleDeleteUser(currentUser.uid)}
-              onLogout={handleLogout}
-            />
-            <UserPanel
-              users={users}
-              onDeleteUser={handleDeleteUser}
-              maxUsers={MAX_USERS}
-              currentUserRole={userProfile?.role}
-              currentUserUid={currentUser.uid}
-            />
-            {/* Login History Panel */}
-            <LoginHistoryPanel sessions={loginSessions} />
-          </div>
-
-          <div className="lg:col-span-7 space-y-8">
-            <div className="rounded-[2rem] border border-slate-800/60 bg-slate-900/30 p-6">
-              <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-400 mb-2">
-                Quick Guide
-              </h3>
-              <p className="text-slate-300 text-sm leading-relaxed">
-                1) Enroll your voice profile once. 2) Encrypt files and choose allowed recipients.
-                3) Recipients verify voice and decrypt only if they are authorized.
+              <h2 className="text-2xl md:text-3xl font-light tracking-tight text-white">
+                Welcome,{' '}
+                <span className="font-bold text-blue-500">{currentUser.displayName || 'Operator'}</span>
+              </h2>
+              <p className="text-sm text-slate-400 max-w-xl">
+                One place to enroll your voice, protect files for your team, and open only what you are allowed to.
               </p>
             </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-6 px-5 py-3 bg-slate-900/60 rounded-2xl border border-slate-800">
+                <div>
+                  <div className="text-[10px] text-slate-500 uppercase font-bold">Team</div>
+                  <div className="text-lg font-mono text-white">{users.length}</div>
+                </div>
+                <div className="w-px h-10 bg-slate-800" />
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase font-bold">Status</div>
+                    <div className="text-sm font-semibold text-emerald-400">Protected</div>
+                  </div>
+                </div>
+                <div className="w-px h-10 bg-slate-800 hidden sm:block" />
+                <div className="hidden sm:block">
+                  <div className="text-[10px] text-slate-500 uppercase font-bold">Region</div>
+                  <div className="text-sm font-mono text-blue-400 max-w-[140px] truncate">
+                    {loginSessions[0]?.city && loginSessions[0].city !== 'Unknown'
+                      ? loginSessions[0].city
+                      : loginSessions[0]?.timezone?.split('/')[1]?.replace(/_/g, ' ') || '—'}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
+
+        {/* Quick guide — single strip */}
+        <section className="rounded-2xl border border-slate-800/70 bg-gradient-to-br from-slate-900/80 to-slate-950/80 p-5 md:p-6">
+          <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3">
+            How it works
+          </h3>
+          <ol className="text-sm text-slate-300 space-y-2 list-decimal list-inside md:flex md:gap-8 md:list-none md:space-y-0">
+            <li className="md:flex-1">
+              <span className="font-semibold text-white">Enroll</span> — record your voice once.
+            </li>
+            <li className="md:flex-1">
+              <span className="font-semibold text-white">Encrypt</span> — choose who may decrypt.
+            </li>
+            <li className="md:flex-1">
+              <span className="font-semibold text-white">Decrypt</span> — voice check + permission.
+            </li>
+          </ol>
+        </section>
+
+        {/* Primary actions */}
+        <section className="space-y-4">
+          <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
+            Choose an action
+          </h3>
+          <FileActions
+            onStartEnrollment={() => setActiveFlow('enroll')}
+            onStartEncryption={() => setActiveFlow('encrypt')}
+            onStartDecryption={() => setActiveFlow('decrypt')}
+          />
+        </section>
+
+        {/* Account + Global registry — side by side on large screens */}
+        <section className="space-y-4">
+          <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
+            Your account & team
+          </h3>
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            <div className="xl:col-span-4 space-y-6">
+              <AccountPanel
+                currentUser={currentUser}
+                userProfile={userProfile}
+                onDeleteMyAccount={() => handleDeleteUser(currentUser.uid)}
+                onLogout={handleLogout}
+              />
+            </div>
+            <div className="xl:col-span-8 min-w-0">
+              <UserPanel
+                users={users}
+                onDeleteUser={handleDeleteUser}
+                maxUsers={MAX_USERS}
+                currentUserRole={userProfile?.role}
+                currentUserUid={currentUser.uid}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Login history — full width, below */}
+        <section className="space-y-4 max-w-4xl">
+          <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
+            Recent sign-ins (this device)
+          </h3>
+          <LoginHistoryPanel sessions={loginSessions} />
+        </section>
+
+        {/* Optional technical feed — bottom */}
+        <section className="space-y-4 pt-2 border-t border-slate-800/60">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
+                Activity & diagnostics
+              </h3>
+              <p className="text-xs text-slate-600 mt-1">
+                File audit trail and system messages — optional; keep closed for a cleaner view.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSecurityFeed((s) => !s)}
+              className="shrink-0 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold border border-slate-700 transition-all"
+            >
+              {showSecurityFeed ? 'Hide details' : 'Show audit & console'}
+            </button>
+          </div>
+          <AnimatePresence>
+            {showSecurityFeed && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+                  <FileHistoryPanel history={fileHistory} />
+                  <SystemLog messages={logMessages} />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </section>
       </main>
 
       {/* Flows */}

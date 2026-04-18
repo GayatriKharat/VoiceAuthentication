@@ -68,7 +68,12 @@ const friendlyError = (code: string | undefined, fallback: string) => {
   }
 };
 
-const AuthModal: React.FC = () => {
+interface AuthModalProps {
+  /** Return to the marketing landing page (clears intro flag in parent). */
+  onBackToIntro?: () => void;
+}
+
+const AuthModal: React.FC<AuthModalProps> = ({ onBackToIntro }) => {
   const [mode, setMode] = useState<Mode>('signin');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -299,6 +304,16 @@ const AuthModal: React.FC = () => {
         transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
         className="w-full max-w-md bg-slate-900/60 backdrop-blur-2xl border border-slate-800 p-8 rounded-[2.5rem] shadow-2xl text-center space-y-6 relative z-10 my-8"
       >
+        {onBackToIntro && (
+          <button
+            type="button"
+            onClick={onBackToIntro}
+            className="absolute top-4 left-4 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500 hover:text-blue-400 transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to intro
+          </button>
+        )}
         {/* Icon */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -311,6 +326,9 @@ const AuthModal: React.FC = () => {
 
         {/* Header */}
         <div className="space-y-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-blue-500/90">
+            Step 2 · Sign in
+          </p>
           <h1 className="text-3xl font-bold tracking-tight text-white">Enterprise Access</h1>
           <p className="text-slate-400 text-sm leading-relaxed">
             Secure Biometric Gateway with multi-language voice authentication.

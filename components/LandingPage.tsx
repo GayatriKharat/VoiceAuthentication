@@ -21,6 +21,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLaunch }) => {
           transition={{ duration: 0.7 }}
           className="max-w-5xl mx-auto text-center space-y-8"
         >
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
+            Step 1 · Welcome
+          </p>
           <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1.5 text-xs uppercase tracking-[0.2em] font-bold text-blue-300">
             <ShieldCheck className="h-3.5 w-3.5" />
             Enterprise Voice Security
@@ -36,13 +39,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLaunch }) => {
             Built for distributed organizations that need speed, trust, and secure collaboration.
           </p>
 
-          <div className="pt-4">
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
+              type="button"
               onClick={onLaunch}
               className="group inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold tracking-wide shadow-2xl shadow-blue-900/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               Launch Secure Access
               <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
+            </button>
+            <button
+              type="button"
+              onClick={onLaunch}
+              className="text-sm text-slate-400 hover:text-white underline-offset-4 hover:underline transition-colors"
+            >
+              Skip intro · Go to sign in
             </button>
           </div>
         </motion.div>
