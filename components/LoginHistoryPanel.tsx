@@ -25,8 +25,32 @@ const countryToFlag = (country: string): string => {
 };
 
 /** Format timestamp to human-readable relative time */
-const timeAgo = (isoString: string): string => {
-  const diff = Date.now() - new Date(isoString).getTime();
+const toValidDate = (value: unknown): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof value === 'object') {
+    const v = value as any;
+    if (typeof v.toDate === 'function') {
+      const d = v.toDate();
+      return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
+    }
+    if (typeof v.seconds === 'number') {
+      const d = new Date(v.seconds * 1000);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+  }
+  return null;
+};
+
+/** Format timestamp to human-readable relative time */
+const timeAgo = (value: unknown): string => {
+  const date = toValidDate(value);
+  if (!date) return 'Unknown time';
+  const diff = Date.now() - date.getTime();
   const mins = Math.floor(diff / 60_000);
   const hrs = Math.floor(mins / 60);
   const days = Math.floor(hrs / 24);
@@ -37,8 +61,10 @@ const timeAgo = (isoString: string): string => {
 };
 
 /** Format timestamp to date string */
-const formatDate = (isoString: string): string => {
-  return new Date(isoString).toLocaleDateString('en-US', {
+const formatDate = (value: unknown): string => {
+  const date = toValidDate(value);
+  if (!date) return 'Unknown date';
+  return date.toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });

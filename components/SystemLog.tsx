@@ -12,6 +12,27 @@ interface SystemLogProps {
 const SystemLog: React.FC<SystemLogProps> = ({ messages }) => {
   const endOfMessagesRef = useRef<HTMLDivElement | null>(null);
 
+  const toValidDate = (value: unknown): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+    if (typeof value === 'string' || typeof value === 'number') {
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    if (typeof value === 'object') {
+      const v = value as any;
+      if (typeof v.toDate === 'function') {
+        const d = v.toDate();
+        return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
+      }
+      if (typeof v.seconds === 'number') {
+        const d = new Date(v.seconds * 1000);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+    }
+    return null;
+  };
+
   useEffect(() => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -53,7 +74,12 @@ const SystemLog: React.FC<SystemLogProps> = ({ messages }) => {
               messages.map((msg, index) => (
                 <div key={msg.id || index} className={`flex items-start gap-4 ${getLogStyle(msg.type)}`}>
                   <div className="flex flex-col items-end min-w-[60px] opacity-40">
-                    <span>{format(new Date(msg.timestamp), 'HH:mm:ss')}</span>
+                    <span>
+                      {(() => {
+                        const date = toValidDate(msg.timestamp);
+                        return date ? format(date, 'HH:mm:ss') : '--:--:--';
+                      })()}
+                    </span>
                   </div>
                   <div className="flex-1 space-y-1">
                     <p className="leading-relaxed">{msg.text}</p>

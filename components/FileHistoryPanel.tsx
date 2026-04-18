@@ -14,6 +14,27 @@ interface FileHistoryPanelProps {
 const FileHistoryPanel: React.FC<FileHistoryPanelProps> = ({ history }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
+  const toValidDate = (value: unknown): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+    if (typeof value === 'string' || typeof value === 'number') {
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    if (typeof value === 'object') {
+      const v = value as any;
+      if (typeof v.toDate === 'function') {
+        const d = v.toDate();
+        return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
+      }
+      if (typeof v.seconds === 'number') {
+        const d = new Date(v.seconds * 1000);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+    }
+    return null;
+  };
+
   const filteredHistory = useMemo(() => {
     return history.filter((entry) => {
       const lowerSearch = searchTerm.toLowerCase();
@@ -86,7 +107,10 @@ const FileHistoryPanel: React.FC<FileHistoryPanelProps> = ({ history }) => {
                       {entry.status}
                     </Badge>
                     <p className="text-[9px] text-slate-600 font-mono">
-                      {format(new Date(entry.timestamp), 'HH:mm:ss')}
+                      {(() => {
+                        const date = toValidDate(entry.timestamp);
+                        return date ? format(date, 'HH:mm:ss') : '--:--:--';
+                      })()}
                     </p>
                   </div>
                 </div>
