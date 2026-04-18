@@ -436,13 +436,6 @@ const App: React.FC = () => {
                 3) Recipients verify voice and decrypt only if they are authorized.
               </p>
             </div>
-            <UserPanel
-              users={users}
-              onDeleteUser={handleDeleteUser}
-              maxUsers={MAX_USERS}
-              currentUserRole={userProfile?.role}
-              currentUserUid={currentUser.uid}
-            />
           </div>
         </div>
       </main>
