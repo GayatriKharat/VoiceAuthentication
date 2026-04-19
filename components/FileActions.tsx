@@ -64,11 +64,11 @@ const FileActions: React.FC<FileActionsProps> = ({
           <img
             src={a.image}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover opacity-95 transition-opacity duration-300 group-hover:opacity-100"
+            className="absolute inset-0 h-full w-full object-cover opacity-85 transition-opacity duration-300 group-hover:opacity-95"
             loading="lazy"
             decoding="async"
           />
-          <div className={`absolute inset-0 bg-gradient-to-br ${a.gradient.replace('/95', '/70').replace('/90', '/60').replace('/85', '/55')}`} />
+          <div className={`absolute inset-0 bg-gradient-to-br ${a.gradient}`} />
           <div className="relative p-4 sm:p-5 flex flex-col gap-3 sm:gap-4 min-h-[112px] sm:min-h-[120px]">
             <div className="flex items-start justify-between gap-3">
               <div
