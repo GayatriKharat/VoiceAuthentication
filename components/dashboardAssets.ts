@@ -1,11 +1,11 @@
-/** Stable Unsplash images (hotlink-friendly); used for dashboard visuals only */
+/** High-quality placeholder images for dashboard visuals */
 export const DASHBOARD_IMAGES = {
-  hero: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1200&h=400&q=85&auto=format&fit=crop',
-  voice: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&h=600&q=85&auto=format&fit=crop',
-  lock: 'https://images.unsplash.com/photo-1633356122544-f134324ef6db?w=800&h=600&q=85&auto=format&fit=crop',
-  team: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=600&q=85&auto=format&fit=crop',
-  encrypt: 'https://images.unsplash.com/photo-1526374965328-7f5ae4e8b69e?w=800&h=600&q=85&auto=format&fit=crop',
-  hackerTools: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&h=600&q=85&auto=format&fit=crop',
-  ethicalHacking: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=800&h=600&q=85&auto=format&fit=crop',
-  penetrationTest: 'https://images.unsplash.com/photo-1516321318423-f06f70674b6c?w=800&h=600&q=85&auto=format&fit=crop',
+  hero: 'https://picsum.photos/1200/400?random=1&blur=2',
+  voice: 'https://picsum.photos/800/600?random=2&blur=1',
+  lock: 'https://picsum.photos/800/600?random=3&blur=1',
+  team: 'https://picsum.photos/800/600?random=4&blur=1',
+  encrypt: 'https://picsum.photos/800/600?random=5&blur=1',
+  hackerTools: 'https://picsum.photos/800/600?random=6&blur=1',
+  ethicalHacking: 'https://picsum.photos/800/600?random=7&blur=1',
+  penetrationTest: 'https://picsum.photos/800/600?random=8&blur=1',
 } as const;
