@@ -19,12 +19,12 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({ displayName, teamCount, r
         <img
           src={DASHBOARD_IMAGES.ethicalHacking}
           alt=""
-          className="h-full w-full object-cover opacity-70"
+          className="h-full w-full object-cover opacity-85"
           loading="eager"
           decoding="async"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#020617] via-[#020617]/70 to-[#020617]/50 sm:to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#020617]/60 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#020617]/40 via-[#020617]/30 to-[#020617]/20 sm:to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#020617]/30 via-transparent to-transparent" />
       </div>
 
       <div className="relative grid gap-5 sm:gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8 p-4 sm:p-6 md:p-7">
