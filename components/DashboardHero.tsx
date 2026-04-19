@@ -19,12 +19,12 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({ displayName, teamCount, r
         <img
           src={DASHBOARD_IMAGES.ethicalHacking}
           alt=""
-          className="h-full w-full object-cover opacity-40"
+          className="h-full w-full object-cover opacity-70"
           loading="eager"
           decoding="async"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#020617] via-[#020617]/95 to-[#020617]/75 sm:to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#020617] via-[#020617]/70 to-[#020617]/50 sm:to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#020617]/60 via-transparent to-transparent" />
       </div>
 
       <div className="relative grid gap-5 sm:gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8 p-4 sm:p-6 md:p-7">
@@ -77,11 +77,11 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({ displayName, teamCount, r
             <img
               src={DASHBOARD_IMAGES.hackerTools}
               alt="Voice and collaboration"
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover opacity-85"
               loading="lazy"
               decoding="async"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#020617]/90 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#020617]/60 via-transparent to-transparent" />
           </div>
           <p className="absolute bottom-3 left-3 right-3 text-[10px] text-slate-500">
             Voice-first access · end-to-end encryption for your files

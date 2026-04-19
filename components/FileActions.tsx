@@ -64,7 +64,7 @@ const FileActions: React.FC<FileActionsProps> = ({
           <img
             src={a.image}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover opacity-35 transition-opacity duration-300 group-hover:opacity-45"
+            className="absolute inset-0 h-full w-full object-cover opacity-60 transition-opacity duration-300 group-hover:opacity-75"
             loading="lazy"
             decoding="async"
           />
