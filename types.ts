@@ -35,8 +35,24 @@ export interface EncryptedFile {
   // v3 (team sharing): FEK wrapped per recipient with their public key.
   senderUid?: string;
   senderName?: string;
-  senderLanguage?: string;
-  recipients?: Array<{ uid: string; name: string; wrappedKey: string }>;
+  senderLanguage?: string;               // e.g., "English", "German", "Hindi"
+  senderLanguageCode?: string;           // BCP-47 code, e.g., "en-US", "de-DE"
+  recipients?: Array<{ 
+    uid: string; 
+    name: string; 
+    wrappedKey: string;
+    accessGrantedAt?: string;            // ISO timestamp of explicit access grant
+    accessGrantedBy?: string;            // UID of user who granted access (for audit)
+  }>;
+  
+  // Access control: explicit grants per user (beyond RSA wrapping)
+  accessGrants?: Array<{
+    uid: string;                         // User ID granted access
+    name: string;                        // User name (for display)
+    grantedAt: string;                   // ISO timestamp of grant
+    grantedBy: string;                   // UID of person who granted access
+    reason?: string;                     // Optional reason for grant
+  }>;
 }
 
 export interface FileHistoryEntry {
@@ -107,5 +123,10 @@ export type AuthAction =
       passPhraseLanguageCode: string;
       recordingLabel?: string; // e.g. "Sample 1 of 2"
     }
-  | { type: 'verify'; user: User }
+  | {
+      type: 'verify';
+      user: User;
+      senderLanguage?: string;           // For file decryption: sender's enrollment language
+      senderLanguageCode?: string;       // For file decryption: sender's language code (BCP-47)
+    }
   | { type: 'identify'; user: User };

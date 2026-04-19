@@ -24,7 +24,7 @@ const UserPanel: React.FC<UserPanelProps> = ({
 }) => {
   return (
     <div className="rounded-2xl border border-slate-800/70 bg-slate-900/50 overflow-hidden flex flex-col min-h-0">
-      <div className="px-5 py-4 border-b border-slate-800/60 flex flex-wrap items-center justify-between gap-2">
+      <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-800/60 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">
             <Users className="h-4 w-4 text-blue-400" />
@@ -36,21 +36,21 @@ const UserPanel: React.FC<UserPanelProps> = ({
           {users.length} / {maxUsers}
         </span>
       </div>
-      <ScrollArea className="h-[min(20rem,38vh)] md:h-[min(22rem,42vh)]">
-        {users.length === 0 ? (
-          <div className="text-center py-16 px-6">
-            <div className="mx-auto w-12 h-12 rounded-xl bg-slate-800/50 flex items-center justify-center mb-3">
-              <UserCircleIcon className="h-7 w-7 text-slate-600" />
-            </div>
-            <p className="text-sm font-medium text-slate-400">No enrolled users yet</p>
-            <p className="text-xs text-slate-600 mt-1">Use Enroll to add the first profile.</p>
+      {users.length === 0 ? (
+        <div className="text-center py-8 px-4 sm:py-10">
+          <div className="mx-auto w-11 h-11 rounded-xl bg-slate-800/50 flex items-center justify-center mb-2">
+            <UserCircleIcon className="h-6 w-6 text-slate-600" />
           </div>
-        ) : (
+          <p className="text-sm font-medium text-slate-400">No enrolled users yet</p>
+          <p className="text-xs text-slate-600 mt-1">Use Enroll to add the first profile.</p>
+        </div>
+      ) : (
+        <ScrollArea className="h-[min(13rem,34dvh)] sm:h-[min(15rem,36dvh)] lg:h-[min(16rem,38dvh)]">
           <ul className="divide-y divide-slate-800/50">
             {users.map((user) => (
               <li
                 key={user.uid}
-                className="px-5 py-4 flex items-center justify-between gap-3 hover:bg-slate-800/30 transition-colors group"
+                className="px-4 py-3 sm:px-5 sm:py-3.5 flex items-center justify-between gap-3 hover:bg-slate-800/30 transition-colors group"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   {user.isEnrolled ? (
@@ -96,8 +96,8 @@ const UserPanel: React.FC<UserPanelProps> = ({
               </li>
             ))}
           </ul>
-        )}
-      </ScrollArea>
+        </ScrollArea>
+      )}
     </div>
   );
 };

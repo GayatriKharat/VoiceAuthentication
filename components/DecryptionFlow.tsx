@@ -461,7 +461,12 @@ const DecryptionFlow: React.FC<DecryptionFlowProps> = ({
 
       {isBiometricModalOpen && currentUserProfile && (
         <BiometricModal
-          action={{ type: 'verify', user: currentUserProfile }}
+          action={{
+            type: 'verify',
+            user: currentUserProfile,
+            senderLanguage: parsedEncryptedData?.senderLanguage,
+            senderLanguageCode: parsedEncryptedData?.senderLanguageCode,
+          }}
           onClose={() => setIsBiometricModalOpen(false)}
           onSuccess={handleVerifySuccess}
           onFailure={handleAuthFailure}

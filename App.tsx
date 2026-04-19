@@ -17,13 +17,7 @@ import DashboardHero from './components/DashboardHero';
 import SecurityActivityPanel from './components/SecurityActivityPanel';
 import { Toaster, toast } from 'sonner';
 import { auth, db, handleFirestoreError, OperationType, requestLoginDigestEmail } from './firebase';
-import {
-  onAuthStateChanged,
-  signOut,
-  isSignInWithEmailLink,
-  signInWithEmailLink,
-  User as FirebaseUser,
-} from 'firebase/auth';
+import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
 import {
   collection,
   onSnapshot,
@@ -57,37 +51,6 @@ const App: React.FC = () => {
 
   // Prevent duplicate login session logging per browser tab
   const sessionLoggedRef = useRef(false);
-  const emailLinkHandledRef = useRef(false);
-
-  // ---------------------------------------------------------------
-  // Email magic link completion (passwordless) — same tab as send
-  // ---------------------------------------------------------------
-  useEffect(() => {
-    if (typeof window === 'undefined' || emailLinkHandledRef.current) return;
-    const href = window.location.href;
-    if (!isSignInWithEmailLink(auth, href)) return;
-
-    emailLinkHandledRef.current = true;
-    const email = localStorage.getItem('emailForSignIn');
-    if (!email) {
-      console.warn('Email link sign-in: missing emailForSignIn');
-      emailLinkHandledRef.current = false;
-      return;
-    }
-
-    (async () => {
-      try {
-        sessionStorage.setItem('vas_last_auth_method', 'email_magic_link');
-        await signInWithEmailLink(auth, email, href);
-        localStorage.removeItem('emailForSignIn');
-        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-      } catch (e) {
-        console.error('Email link sign-in failed:', e);
-        emailLinkHandledRef.current = false;
-        toast.error('Sign-in link invalid or expired. Request a new one.');
-      }
-    })();
-  }, []);
 
   // ---------------------------------------------------------------
   // Auth Listener
@@ -414,7 +377,7 @@ const App: React.FC = () => {
 
       <Header user={currentUser} onLogout={handleLogout} />
 
-      <main className="relative container mx-auto max-w-7xl px-4 md:px-8 py-6 md:py-9 space-y-8">
+      <main className="relative container mx-auto max-w-7xl px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-5 md:py-6 space-y-5 sm:space-y-6 lg:space-y-7">
         <DashboardHero
           displayName={currentUser.displayName}
           teamCount={users.length}
@@ -422,10 +385,10 @@ const App: React.FC = () => {
         />
 
         {/* Primary actions */}
-        <section className="space-y-4">
+        <section className="space-y-3 sm:space-y-4">
           <div>
-            <h3 className="text-lg font-semibold text-white tracking-tight">What do you want to do?</h3>
-            <p className="text-sm text-slate-500 mt-1">Pick a step — you can come back to this hub anytime.</p>
+            <h3 className="text-base sm:text-lg font-semibold text-white tracking-tight">What do you want to do?</h3>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 sm:mt-1">Pick a step — you can return here anytime.</p>
           </div>
           <FileActions
             onStartEnrollment={() => setActiveFlow('enroll')}
@@ -435,13 +398,13 @@ const App: React.FC = () => {
         </section>
 
         {/* Account + team */}
-        <section className="space-y-4">
+        <section className="space-y-3 sm:space-y-4">
           <div>
-            <h3 className="text-lg font-semibold text-white tracking-tight">Account & team</h3>
-            <p className="text-sm text-slate-500 mt-1">Your profile and enrolled people in this workspace.</p>
+            <h3 className="text-base sm:text-lg font-semibold text-white tracking-tight">Account & team</h3>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 sm:mt-1">Your profile and everyone enrolled here.</p>
           </div>
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
-            <div className="xl:col-span-4 min-w-0">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-stretch lg:items-start">
+            <div className="lg:col-span-4 min-w-0 lg:max-w-none">
               <AccountPanel
                 currentUser={currentUser}
                 userProfile={userProfile}
@@ -449,7 +412,7 @@ const App: React.FC = () => {
                 onLogout={handleLogout}
               />
             </div>
-            <div className="xl:col-span-8 min-w-0">
+            <div className="lg:col-span-8 min-w-0 flex flex-col">
               <UserPanel
                 users={users}
                 onDeleteUser={handleDeleteUser}
@@ -462,7 +425,7 @@ const App: React.FC = () => {
         </section>
 
         {/* Sign-ins */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start max-w-6xl">
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-stretch w-full">
           <LoginHistoryPanel sessions={loginSessions} />
           <SecurityActivityPanel userUid={currentUser.uid} />
         </section>

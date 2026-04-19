@@ -223,3 +223,65 @@ export const compareVoiceprints = (vp1: Float32Array | null, vp2: Float32Array |
   console.log(`[Biometric Analysis] Match Confidence: ${(score * 100).toFixed(2)}% | Threshold: ${(SIMILARITY_THRESHOLD * 100).toFixed(2)}%`);
   return score >= SIMILARITY_THRESHOLD;
 };
+
+/**
+ * Verify voice with language enforcement
+ * Ensures that the user's current verification language matches their enrollment language
+ * This prevents cross-language voice spoofing attempts
+ */
+export const compareVoiceprintsWithLanguage = (
+  enrolledVp: Float32Array | null,
+  currentVp: Float32Array | null,
+  enrolledLanguageCode: string | undefined,
+  verificationLanguageCode: string | undefined
+): { 
+  isMatch: boolean; 
+  score: number; 
+  langMismatch: boolean; 
+  reason: string 
+} => {
+  if (!enrolledVp || !currentVp) {
+    return { 
+      isMatch: false, 
+      score: 0, 
+      langMismatch: false, 
+      reason: 'Missing voiceprint data' 
+    };
+  }
+
+  // Check language match first - this is a hard requirement
+  const langMismatch = 
+    enrolledLanguageCode && 
+    verificationLanguageCode && 
+    enrolledLanguageCode !== verificationLanguageCode;
+
+  if (langMismatch) {
+    console.warn(
+      `[Language Mismatch] Enrolled: ${enrolledLanguageCode}, Verification: ${verificationLanguageCode}`
+    );
+    return {
+      isMatch: false,
+      score: 0,
+      langMismatch: true,
+      reason: `Language mismatch: You enrolled with ${enrolledLanguageCode} but are verifying with ${verificationLanguageCode}. Please use the same language.`
+    };
+  }
+
+  // Voice similarity check
+  const score = getVoiceSimilarityScore(enrolledVp, currentVp);
+  const isMatch = score >= SIMILARITY_THRESHOLD;
+
+  console.log(
+    `[Biometric Analysis] Lang: ${verificationLanguageCode || 'unknown'} | ` +
+    `Match Confidence: ${(score * 100).toFixed(2)}% | Threshold: ${(SIMILARITY_THRESHOLD * 100).toFixed(2)}%`
+  );
+
+  return {
+    isMatch,
+    score,
+    langMismatch: false,
+    reason: isMatch 
+      ? 'Voice verified successfully' 
+      : `Voice not recognized (${(score * 100).toFixed(1)}% match). Access denied.`
+  };
+};

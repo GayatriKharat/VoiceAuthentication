@@ -88,7 +88,7 @@ const formatDate = (value: unknown): string => {
 const LoginHistoryPanel: React.FC<LoginHistoryPanelProps> = ({ sessions }) => {
   return (
     <div className="rounded-2xl border border-slate-800/70 bg-slate-900/50 overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-800/60 flex flex-wrap items-center justify-between gap-2">
+      <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-800/60 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">
             <History className="h-4 w-4 text-blue-400" />
@@ -101,16 +101,16 @@ const LoginHistoryPanel: React.FC<LoginHistoryPanelProps> = ({ sessions }) => {
         </span>
       </div>
 
-      <ScrollArea className="h-56">
-        {sessions.length === 0 ? (
-          <div className="text-center py-12 px-6">
-            <div className="mx-auto w-11 h-11 rounded-xl bg-slate-800/50 flex items-center justify-center mb-2">
-              <MapPin className="h-5 w-5 text-slate-600" />
-            </div>
-            <p className="text-sm text-slate-500">No sessions yet</p>
-            <p className="text-xs text-slate-600 mt-1">History appears after you sign in.</p>
+      {sessions.length === 0 ? (
+        <div className="text-center py-6 px-4 sm:py-8">
+          <div className="mx-auto w-10 h-10 rounded-lg bg-slate-800/50 flex items-center justify-center mb-2">
+            <MapPin className="h-4 w-4 text-slate-600" />
           </div>
-        ) : (
+          <p className="text-sm text-slate-500">No sessions yet</p>
+          <p className="text-xs text-slate-600 mt-1">History appears after you sign in.</p>
+        </div>
+      ) : (
+        <ScrollArea className="h-[min(11rem,30dvh)] sm:h-[min(12rem,32dvh)]">
           <ul className="divide-y divide-slate-800/50">
             {sessions.map((session, idx) => {
               const isRecent = idx === 0;
@@ -121,7 +121,7 @@ const LoginHistoryPanel: React.FC<LoginHistoryPanelProps> = ({ sessions }) => {
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: idx * 0.03 }}
-                  className={`px-5 py-3.5 flex items-start gap-3 ${isRecent ? 'bg-blue-500/[0.06]' : ''}`}
+                  className={`px-4 py-2.5 sm:px-5 sm:py-3 flex items-start gap-2.5 sm:gap-3 ${isRecent ? 'bg-blue-500/[0.06]' : ''}`}
                 >
                   <div
                     className={`mt-0.5 w-9 h-9 rounded-lg flex items-center justify-center text-base shrink-0 border ${
@@ -159,8 +159,8 @@ const LoginHistoryPanel: React.FC<LoginHistoryPanelProps> = ({ sessions }) => {
               );
             })}
           </ul>
-        )}
-      </ScrollArea>
+        </ScrollArea>
+      )}
     </div>
   );
 };

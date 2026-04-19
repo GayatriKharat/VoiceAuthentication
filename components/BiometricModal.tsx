@@ -3,6 +3,7 @@ import { AuthAction, User } from '../types';
 import {
   generateVoiceprint,
   getVoiceSimilarityScore,
+  compareVoiceprintsWithLanguage,
   SIMILARITY_THRESHOLD,
   VoiceProcessingError,
   getAudioContext,
@@ -180,12 +181,30 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
               onFailure('No voiceprint on file for this user.');
               return;
             }
-            const score = getVoiceSimilarityScore(currentVoiceprint, storedVp);
-            if (score >= SIMILARITY_THRESHOLD) {
+
+            // Use language-specific verification if sender language is provided (e.g., during file decryption)
+            if (action.senderLanguageCode) {
+              const verifyResult = compareVoiceprintsWithLanguage(
+                storedVp,
+                currentVoiceprint,
+                action.user.passPhraseLanguageCode,
+                action.senderLanguageCode
+              );
+
+              if (!verifyResult.isMatch) {
+                onFailure(verifyResult.reason);
+                return;
+              }
               onSuccess({ user: action.user, voiceprint: currentVoiceprint });
             } else {
-              const confidence = score > 0 ? (score * 100).toFixed(1) : '0';
-              onFailure(`Voice not recognised (${confidence}% match). Access denied.`);
+              // Standard verification without language enforcement (e.g., regular login)
+              const score = getVoiceSimilarityScore(storedVp, currentVoiceprint);
+              if (score >= SIMILARITY_THRESHOLD) {
+                onSuccess({ user: action.user, voiceprint: currentVoiceprint });
+              } else {
+                const confidence = score > 0 ? (score * 100).toFixed(1) : '0';
+                onFailure(`Voice not recognised (${confidence}% match). Access denied.`);
+              }
             }
           } else if (action.type === 'identify') {
             // 'identify' used in legacy paths — search enrolled users
@@ -313,26 +332,36 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
             </p>
           </div>
 
-          {/* Required Phrase Box */}
-          <div className="bg-slate-800/50 p-5 rounded-2xl border border-slate-700/50 space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold text-blue-400 uppercase tracking-[0.2em]">
-                Required Phrase:
-              </p>
-              {langName && (
-                <span className="flex items-center gap-1 text-[10px] text-slate-500 font-semibold">
-                  <Globe className="w-3 h-3" />
-                  {langName}
-                </span>
-              )}
+          {/* Required Phrase Box - Only show during enrollment (kept secret during verification) */}
+          {action.type === 'enroll' && (
+            <div className="bg-slate-800/50 p-5 rounded-2xl border border-slate-700/50 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold text-blue-400 uppercase tracking-[0.2em]">
+                  Phrase to Enroll:
+                </p>
+                {langName && (
+                  <span className="flex items-center gap-1 text-[10px] text-slate-500 font-semibold">
+                    <Globe className="w-3 h-3" />
+                    {langName}
+                  </span>
+                )}
+              </div>
+              <h3
+                className="text-lg font-medium text-white italic leading-snug"
+                dir={rtl ? 'rtl' : 'ltr'}
+              >
+                "{requiredPhrase}"
+              </h3>
             </div>
-            <h3
-              className="text-lg font-medium text-white italic leading-snug"
-              dir={rtl ? 'rtl' : 'ltr'}
-            >
-              "{requiredPhrase}"
-            </h3>
-          </div>
+          )}
+
+          {/* Language indicator during verification */}
+          {action.type !== 'enroll' && langName && (
+            <div className="bg-blue-600/10 p-4 rounded-2xl border border-blue-500/20 flex items-center justify-center gap-2">
+              <Globe className="w-4 h-4 text-blue-400" />
+              <span className="text-sm font-semibold text-blue-300">Verification Language: {langName}</span>
+            </div>
+          )}
 
           {/* Live transcript */}
           <AnimatePresence>

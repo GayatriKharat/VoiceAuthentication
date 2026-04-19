@@ -22,7 +22,7 @@ const AccountPanel: React.FC<AccountPanelProps> = ({
 
   return (
     <div className="rounded-2xl border border-slate-800/70 bg-slate-900/50 overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-800/60">
+      <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-800/60">
         <h2 className="text-sm font-semibold text-white flex items-center gap-2">
           <UserCircle className="h-4 w-4 text-blue-400" />
           Account
@@ -30,7 +30,7 @@ const AccountPanel: React.FC<AccountPanelProps> = ({
         <p className="text-xs text-slate-500 mt-0.5">Your session and enrollment</p>
       </div>
 
-      <div className="p-5 space-y-5">
+      <div className="p-4 sm:p-5 space-y-4">
         <div className="flex items-start gap-3">
           {isEnrolled ? (
             <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/25">

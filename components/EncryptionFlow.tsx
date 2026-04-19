@@ -157,6 +157,7 @@ const EncryptionFlow: React.FC<EncryptionFlowProps> = ({
           uid: sender.uid,
           name: sender.name,
           language: sender.passPhraseLanguage,
+          languageCode: sender.passPhraseLanguageCode,
         },
         recipients
       );

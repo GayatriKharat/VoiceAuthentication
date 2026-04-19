@@ -257,6 +257,7 @@ export interface TeamSender {
   uid: string;
   name: string;
   language?: string;
+  languageCode?: string;
 }
 
 /**
@@ -320,6 +321,7 @@ export const encryptFileForTeam = async (
     senderUid: sender.uid,
     senderName: sender.name,
     senderLanguage: sender.language,
+    senderLanguageCode: sender.languageCode,
     recipients: wrappedForRecipients,
   };
 };
