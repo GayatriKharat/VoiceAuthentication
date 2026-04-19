@@ -15,7 +15,6 @@ const actions = [
     onClickKey: 'enroll' as const,
     icon: UserPlus,
     image: DASHBOARD_IMAGES.voice,
-    gradient: 'from-blue-950/95 via-slate-950/85 to-slate-950/90',
     accent: 'text-blue-400',
     ring: 'ring-blue-500/25',
   },
@@ -25,7 +24,6 @@ const actions = [
     onClickKey: 'encrypt' as const,
     icon: Lock,
     image: DASHBOARD_IMAGES.encrypt,
-    gradient: 'from-indigo-950/95 via-slate-950/85 to-slate-950/90',
     accent: 'text-indigo-400',
     ring: 'ring-indigo-500/25',
   },
@@ -35,7 +33,6 @@ const actions = [
     onClickKey: 'decrypt' as const,
     icon: Unlock,
     image: DASHBOARD_IMAGES.team,
-    gradient: 'from-emerald-950/90 via-slate-950/85 to-slate-950/90',
     accent: 'text-emerald-400',
     ring: 'ring-emerald-500/25',
   },
@@ -59,28 +56,39 @@ const FileActions: React.FC<FileActionsProps> = ({
           key={a.title}
           type="button"
           onClick={handlers[a.onClickKey]}
-          className={`group relative text-left rounded-2xl border border-slate-800/80 overflow-hidden focus:outline-none focus-visible:ring-2 ${a.ring} transition-transform hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40`}
+          className={`group relative text-left rounded-2xl border border-slate-800/80 overflow-hidden focus:outline-none focus-visible:ring-2 ${a.ring} transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/40`}
         >
+          {/* ✅ IMAGE (NO BLUR NOW → visible) */}
           <img
             src={a.image}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover opacity-100 transition-opacity duration-300 group-hover:opacity-100"
+            alt={a.title}
+            className="absolute inset-0 h-full w-full object-cover"
             loading="lazy"
             decoding="async"
           />
-          <div className={`absolute inset-0 bg-gradient-to-br from-black/20 via-black/10 to-black/20`} />
-          <div className="relative p-4 sm:p-5 flex flex-col gap-3 sm:gap-4 min-h-[112px] sm:min-h-[120px]">
+
+          {/* ✅ LIGHT OVERLAY (so image is visible) */}
+          <div className="absolute inset-0 bg-black/40" />
+
+          {/* CONTENT */}
+          <div className="relative p-4 sm:p-5 flex flex-col gap-3 sm:gap-4 min-h-[120px]">
             <div className="flex items-start justify-between gap-3">
               <div
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/35 backdrop-blur-sm ${a.accent}`}
+                className={`flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-black/40 ${a.accent}`}
               >
                 <a.icon className="h-5 w-5" />
               </div>
-              <ChevronRight className="h-5 w-5 text-slate-500 group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0 mt-0.5" />
+
+              <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-white group-hover:translate-x-1 transition-all mt-0.5" />
             </div>
+
             <div>
-              <h3 className="font-semibold text-white text-lg leading-tight">{a.title}</h3>
-              <p className="text-slate-400 text-sm mt-1 leading-snug">{a.desc}</p>
+              <h3 className="font-semibold text-white text-lg">
+                {a.title}
+              </h3>
+              <p className="text-slate-300 text-sm mt-1">
+                {a.desc}
+              </p>
             </div>
           </div>
         </button>

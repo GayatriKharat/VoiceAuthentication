@@ -15,7 +15,7 @@ export const DASHBOARD_IMAGES = {
 
   // ENCRYPT (lock / security)
   encrypt:
-    'https://images.unsplash.com/photo-1526374965328-7f5ae4e8b08f?w=1200&q=85&auto=format',
+  'https://images.unsplash.com/photo-1510511459019-5dda7724fd87?w=1200&q=85&auto=format',
 
   // DECRYPT (team / access)
   team:
