@@ -17,7 +17,7 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({ displayName, teamCount, r
       {/* Background image + gradient */}
       <div className="absolute inset-0">
         <img
-          src={DASHBOARD_IMAGES.hero}
+          src={DASHBOARD_IMAGES.ethicalHacking}
           alt=""
           className="h-full w-full object-cover opacity-40"
           loading="eager"
@@ -75,7 +75,7 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({ displayName, teamCount, r
         >
           <div className="absolute inset-0 rounded-xl sm:rounded-2xl border border-white/10 overflow-hidden shadow-xl">
             <img
-              src={DASHBOARD_IMAGES.voice}
+              src={DASHBOARD_IMAGES.hackerTools}
               alt="Voice and collaboration"
               className="h-full w-full object-cover"
               loading="lazy"

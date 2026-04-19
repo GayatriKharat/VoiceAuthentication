@@ -24,7 +24,7 @@ const actions = [
     desc: 'Lock a file for chosen teammates.',
     onClickKey: 'encrypt' as const,
     icon: Lock,
-    image: DASHBOARD_IMAGES.lock,
+    image: DASHBOARD_IMAGES.encrypt,
     gradient: 'from-indigo-950/95 via-slate-950/85 to-slate-950/90',
     accent: 'text-indigo-400',
     ring: 'ring-indigo-500/25',
