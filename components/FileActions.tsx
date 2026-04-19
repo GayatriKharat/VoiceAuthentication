@@ -2,99 +2,72 @@ import React from 'react';
 import { UserPlus, Lock, Unlock, ChevronRight } from 'lucide-react';
 import { DASHBOARD_IMAGES } from './dashboardAssets';
 
-interface FileActionsProps {
-  onStartEnrollment: () => void;
-  onStartEncryption: () => void;
-  onStartDecryption: () => void;
-}
-
 const actions = [
   {
     title: 'Enroll',
-    desc: 'Record your voice profile once.',
-    onClickKey: 'enroll' as const,
+    desc: 'Record your voice profile.',
     icon: UserPlus,
     image: DASHBOARD_IMAGES.voice,
-    accent: 'text-blue-400',
-    ring: 'ring-blue-500/25',
+    color: 'blue',
   },
   {
     title: 'Encrypt',
-    desc: 'Lock a file for chosen teammates.',
-    onClickKey: 'encrypt' as const,
+    desc: 'Secure your files.',
     icon: Lock,
     image: DASHBOARD_IMAGES.encrypt,
-    accent: 'text-indigo-400',
-    ring: 'ring-indigo-500/25',
+    color: 'indigo',
   },
   {
     title: 'Decrypt',
-    desc: 'Open a file if you are allowed.',
-    onClickKey: 'decrypt' as const,
+    desc: 'Access authorized files.',
     icon: Unlock,
     image: DASHBOARD_IMAGES.team,
-    accent: 'text-emerald-400',
-    ring: 'ring-emerald-500/25',
+    color: 'emerald',
   },
 ];
 
-const FileActions: React.FC<FileActionsProps> = ({
+export default function FileActions({
   onStartEnrollment,
   onStartEncryption,
   onStartDecryption,
-}) => {
-  const handlers = {
-    enroll: onStartEnrollment,
-    encrypt: onStartEncryption,
-    decrypt: onStartDecryption,
-  };
+}: any) {
+  const handlers = [onStartEnrollment, onStartEncryption, onStartDecryption];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {actions.map((a) => (
+    <div className="grid md:grid-cols-3 gap-5">
+
+      {actions.map((a, i) => (
         <button
           key={a.title}
-          type="button"
-          onClick={handlers[a.onClickKey]}
-          className={`group relative text-left rounded-2xl border border-slate-800/80 overflow-hidden focus:outline-none focus-visible:ring-2 ${a.ring} transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/40`}
+          onClick={handlers[i]}
+          className="group relative rounded-2xl overflow-hidden border border-indigo-500/10 hover:border-indigo-400/40 transition-all duration-300 hover:shadow-[0_0_30px_rgba(99,102,241,0.25)]"
         >
-          {/* ✅ IMAGE (NO BLUR NOW → visible) */}
+          {/* IMAGE */}
           <img
             src={a.image}
-            alt={a.title}
-            className="absolute inset-0 h-full w-full object-cover"
-            loading="lazy"
-            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover brightness-75 group-hover:brightness-100 transition"
           />
 
-          {/* ✅ LIGHT OVERLAY (so image is visible) */}
-         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/20" />
+          {/* OVERLAY */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
 
           {/* CONTENT */}
-          <div className="relative p-4 sm:p-5 flex flex-col gap-3 sm:gap-4 min-h-[120px]">
-            <div className="flex items-start justify-between gap-3">
-              <div
-                className={`flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-black/40 ${a.accent}`}
-              >
-                <a.icon className="h-5 w-5" />
-              </div>
+          <div className="relative p-5 flex flex-col justify-between min-h-[140px]">
 
-              <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-white group-hover:translate-x-1 transition-all mt-0.5" />
+            <div className="flex justify-between">
+              <a.icon className="text-indigo-400" />
+              <ChevronRight className="text-slate-400 group-hover:translate-x-1 transition" />
             </div>
 
             <div>
-              <h3 className="font-semibold text-white text-lg">
-                {a.title}
-              </h3>
-              <p className="text-slate-300 text-sm mt-1">
-                {a.desc}
-              </p>
+              <h3 className="text-white text-lg font-semibold">{a.title}</h3>
+              <p className="text-slate-400 text-sm">{a.desc}</p>
             </div>
+
           </div>
         </button>
       ))}
+
     </div>
   );
-};
-
-export default FileActions;
+}
