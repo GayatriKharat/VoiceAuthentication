@@ -78,10 +78,13 @@ const isRtl = (langCode: string): boolean =>
 // Component
 // ---------------------------------------------------------------
 const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSuccess, onFailure }) => {
-  const [status, setStatus] = useState<'idle' | 'recording' | 'processing' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'recording' | 'processing' | 'review' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [countdown, setCountdown] = useState(RECORDING_DURATION_MS / 1000);
   const [liveTranscript, setLiveTranscript] = useState('');
+  const [reviewTranscript, setReviewTranscript] = useState('');
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState('');
+  const [pendingVoiceprint, setPendingVoiceprint] = useState<Float32Array | null>(null);
   const [phraseVerified, setPhraseVerified] = useState<boolean | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -149,8 +152,8 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
         }
 
         // --- Phrase verification (if SpeechRecognition available) ---
+        const transcript = transcriptRef.current.trim();
         if (hasSpeechRecognition && action.type !== 'enroll') {
-          const transcript = transcriptRef.current.trim();
           if (transcript) {
             const score = phraseMatchScore(transcript, requiredPhrase);
             if (score < PHRASE_MATCH_THRESHOLD) {
@@ -169,10 +172,26 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
           const audioBlob = new Blob(audioChunksRef.current, {
             type: mediaRecorderRef.current?.mimeType || 'audio/webm',
           });
+
+          const audioDataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result;
+              if (typeof result === 'string') resolve(result);
+              else reject(new Error('Unable to encode audio data.'));
+            };
+            reader.onerror = () => reject(new Error('Unable to encode audio data.'));
+            reader.readAsDataURL(audioBlob);
+          });
+
           const currentVoiceprint = await generateVoiceprint(audioBlob);
 
           if (action.type === 'enroll') {
-            onSuccess(currentVoiceprint);
+            setReviewTranscript(transcript);
+            setRecordedAudioUrl(audioDataUrl);
+            setPendingVoiceprint(currentVoiceprint);
+            setStatus('review');
+            return;
           } else if (action.type === 'verify') {
             const storedVp = action.user.voiceprint
               ? new Float32Array(action.user.voiceprint)
@@ -332,12 +351,12 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
             </p>
           </div>
 
-          {/* Required Phrase Box - Only show during enrollment (kept secret during verification) */}
+          {/* Enrollment prompt */}
           {action.type === 'enroll' && (
             <div className="bg-slate-800/50 p-5 rounded-2xl border border-slate-700/50 space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold text-blue-400 uppercase tracking-[0.2em]">
-                  Phrase to Enroll:
+                  Voice Password Capture:
                 </p>
                 {langName && (
                   <span className="flex items-center gap-1 text-[10px] text-slate-500 font-semibold">
@@ -350,7 +369,9 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
                 className="text-lg font-medium text-white italic leading-snug"
                 dir={rtl ? 'rtl' : 'ltr'}
               >
-                "{requiredPhrase}"
+                {requiredPhrase
+                  ? `Speak the same phrase as displayed when enrolling.`
+                  : 'Speak your voice password phrase clearly. The system will transcribe it and ask for correction.'}
               </h3>
             </div>
           )}
@@ -424,6 +445,8 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
                   </div>
                 ) : status === 'processing' ? (
                   <Loader2 className="h-10 w-10 text-white animate-spin" />
+                ) : status === 'review' ? (
+                  <div className="text-white font-bold text-sm">Review</div>
                 ) : (
                   <Mic className="h-10 w-10 text-white" />
                 )}
@@ -498,6 +521,58 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
             <p className="text-[10px] text-slate-600 text-center">
               ℹ️ Voice-only mode — phrase content verification unavailable in this browser.
             </p>
+          )}
+
+          {/* Review transcript after enrollment capture */}
+          {status === 'review' && action.type === 'enroll' && (
+            <div className="space-y-3 text-left bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4">
+              <h3 className="text-sm font-semibold text-white uppercase tracking-[0.2em]">
+                Review your voice password text
+              </h3>
+              <p className="text-slate-400 text-xs">
+                If the text below does not match your spoken voice password, correct it before saving.
+              </p>
+              <textarea
+                value={reviewTranscript}
+                onChange={(e) => setReviewTranscript(e.target.value)}
+                rows={4}
+                className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
+              />
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatus('idle');
+                    setLiveTranscript('');
+                    transcriptRef.current = '';
+                    setReviewTranscript('');
+                    setRecordedAudioUrl('');
+                    setPendingVoiceprint(null);
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 rounded-2xl border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors"
+                >
+                  Retry Recording
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!pendingVoiceprint) {
+                      setErrorMessage('No captured voice sample to save.');
+                      setStatus('error');
+                      return;
+                    }
+                    onSuccess({
+                      voiceprint: pendingVoiceprint,
+                      transcript: reviewTranscript.trim() || transcriptRef.current.trim(),
+                      audioDataUrl: recordedAudioUrl,
+                    });
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-colors"
+                >
+                  Save Voice Password
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Retry button */}

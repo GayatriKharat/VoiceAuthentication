@@ -32,6 +32,16 @@ const LANGUAGES: Language[] = [
     ],
   },
   {
+    code: 'mr-IN',
+    label: 'Marathi (मराठी)',
+    flag: '🇮🇳',
+    phrases: [
+      'माझा आवाज माझा पासवर्ड आहे',
+      'माझ्या आवाजाने माझी ओळख सत्यापित करा',
+      'आवाजाने माझा डेटा सुरक्षित करा',
+    ],
+  },
+  {
     code: 'ur-PK',
     label: 'Urdu (اردو)',
     flag: '🇵🇰',
@@ -145,9 +155,10 @@ export interface PhraseSelection {
 
 interface PhraseSelectorProps {
   onConfirm: (selection: PhraseSelection) => void;
+  mode?: 'phrase' | 'languageOnly';
 }
 
-const PhraseSelector: React.FC<PhraseSelectorProps> = ({ onConfirm }) => {
+const PhraseSelector: React.FC<PhraseSelectorProps> = ({ onConfirm, mode = 'phrase' }) => {
   const [selectedLang, setSelectedLang] = useState<Language>(LANGUAGES[0]);
   const [selectedPhrase, setSelectedPhrase] = useState<string>(LANGUAGES[0].phrases[0]);
   const [isCustom, setIsCustom] = useState(false);
@@ -156,7 +167,7 @@ const PhraseSelector: React.FC<PhraseSelectorProps> = ({ onConfirm }) => {
 
   const activePhrase = isCustom ? customPhrase.trim() : selectedPhrase;
   const wordCount = activePhrase.split(/\s+/).filter(Boolean).length;
-  const isValid = wordCount >= 3 && activePhrase.length > 0;
+  const isValid = mode === 'languageOnly' ? true : wordCount >= 3 && activePhrase.length > 0;
 
   const handleLangSelect = (lang: Language) => {
     setSelectedLang(lang);
@@ -168,7 +179,7 @@ const PhraseSelector: React.FC<PhraseSelectorProps> = ({ onConfirm }) => {
   const handleConfirm = () => {
     if (!isValid) return;
     onConfirm({
-      phrase: activePhrase,
+      phrase: mode === 'languageOnly' ? '' : activePhrase,
       language: selectedLang.label.split(' ')[0], // "Hindi" from "Hindi (हिंदी)"
       languageCode: selectedLang.code,
     });
@@ -226,10 +237,10 @@ const PhraseSelector: React.FC<PhraseSelectorProps> = ({ onConfirm }) => {
       {/* Phrase Options */}
       <div className="space-y-2">
         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-          Choose Your Passphrase
+          {mode === 'languageOnly' ? 'Confirm Language' : 'Choose Your Passphrase'}
         </label>
         <div className="space-y-2">
-          {selectedLang.phrases.map((phrase) => (
+          {mode !== 'languageOnly' && selectedLang.phrases.map((phrase) => (
             <button
               key={phrase}
               type="button"
@@ -251,24 +262,26 @@ const PhraseSelector: React.FC<PhraseSelectorProps> = ({ onConfirm }) => {
           ))}
 
           {/* Custom Option */}
-          <button
-            type="button"
-            onClick={() => setIsCustom(true)}
-            className={`w-full text-left px-4 py-3.5 rounded-2xl border transition-all text-sm ${
-              isCustom
-                ? 'border-blue-500/50 bg-blue-500/10 text-white'
-                : 'border-slate-700 border-dashed bg-transparent text-slate-500 hover:border-slate-600 hover:text-slate-400'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <Languages className="w-4 h-4" />
-              {isCustom ? 'Writing custom phrase...' : '+ Write my own phrase'}
-            </span>
-          </button>
+          {mode !== 'languageOnly' && (
+            <button
+              type="button"
+              onClick={() => setIsCustom(true)}
+              className={`w-full text-left px-4 py-3.5 rounded-2xl border transition-all text-sm ${
+                isCustom
+                  ? 'border-blue-500/50 bg-blue-500/10 text-white'
+                  : 'border-slate-700 border-dashed bg-transparent text-slate-500 hover:border-slate-600 hover:text-slate-400'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Languages className="w-4 h-4" />
+                {isCustom ? 'Writing custom phrase...' : '+ Write my own phrase'}
+              </span>
+            </button>
+          )}
         </div>
 
         <AnimatePresence>
-          {isCustom && (
+          {mode !== 'languageOnly' && isCustom && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
@@ -292,7 +305,7 @@ const PhraseSelector: React.FC<PhraseSelectorProps> = ({ onConfirm }) => {
       </div>
 
       {/* Preview */}
-      {activePhrase && (
+      {mode !== 'languageOnly' && activePhrase && (
         <motion.div
           key={activePhrase}
           initial={{ opacity: 0 }}
@@ -318,7 +331,7 @@ const PhraseSelector: React.FC<PhraseSelectorProps> = ({ onConfirm }) => {
         disabled={!isValid}
         className="w-full h-12 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-900/20"
       >
-        Confirm Passphrase
+        {mode === 'languageOnly' ? 'Confirm Language' : 'Confirm Passphrase'}
       </button>
     </div>
   );

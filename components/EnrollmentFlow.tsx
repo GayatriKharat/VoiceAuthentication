@@ -5,7 +5,7 @@ import PhraseSelector, { PhraseSelection } from './PhraseSelector';
 import FlowModalShell from './FlowModalShell';
 import { X } from 'lucide-react';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
-import { setDoc, doc } from 'firebase/firestore';
+import { setDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -17,7 +17,7 @@ import { generateUserKeyMaterial } from '../utils/crypto';
 import { recordSecurityEvent } from '../utils/securityAudit';
 import { motion, AnimatePresence } from 'framer-motion';
 
-type Step = 'name' | 'phrase' | 'enroll1' | 'enroll2' | 'saving' | 'error';
+type Step = 'name' | 'language' | 'enroll1' | 'enroll2' | 'saving' | 'error';
 
 interface EnrollmentFlowProps {
   currentUser: FirebaseUser;
@@ -28,7 +28,7 @@ interface EnrollmentFlowProps {
 
 const STEP_LABELS: Record<Step, string> = {
   name: 'Identity',
-  phrase: 'Passphrase',
+  language: 'Language',
   enroll1: 'Sample 1',
   enroll2: 'Sample 2',
   saving: 'Complete',
@@ -42,8 +42,10 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
 }) => {
   const [step, setStep] = useState<Step>('name');
   const [userName, setUserName] = useState(currentUser.displayName || '');
-  const [phraseSelection, setPhraseSelection] = useState<PhraseSelection | null>(null);
+  const [languageSelection, setLanguageSelection] = useState<PhraseSelection | null>(null);
   const [voiceprint1, setVoiceprint1] = useState<Float32Array | null>(null);
+  const [voicePasswordText, setVoicePasswordText] = useState('');
+  const [voicePasswordAudio, setVoicePasswordAudio] = useState('');
   const [isBiometricOpen, setIsBiometricOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState<string>(
@@ -51,40 +53,53 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
   );
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const steps: Step[] = ['name', 'phrase', 'enroll1', 'enroll2', 'saving'];
+  const steps: Step[] = ['name', 'language', 'enroll1', 'enroll2', 'saving'];
   const currentStepIdx = steps.indexOf(step);
 
   const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!userName.trim()) return;
     addLog(`Initialising enrollment for: ${userName.trim()}`, 'info');
-    setStep('phrase');
+    setStep('language');
   };
 
-  const handlePhraseConfirm = (selection: PhraseSelection) => {
-    setPhraseSelection(selection);
-    addLog(`Passphrase set in ${selection.language}: "${selection.phrase.slice(0, 30)}..."`, 'info');
+  const handleLanguageConfirm = (selection: PhraseSelection) => {
+    setLanguageSelection(selection);
+    addLog(`Voice password language selected: ${selection.language}`, 'info');
     setStep('enroll1');
     setIsBiometricOpen(true);
   };
 
-  const handleEnroll1Success = (result: Float32Array) => {
+  const handleEnroll1Success = (result: {
+    voiceprint: Float32Array;
+    transcript: string;
+    audioDataUrl: string;
+  }) => {
     setIsBiometricOpen(false);
-    setVoiceprint1(result);
+    setVoiceprint1(result.voiceprint);
+    setVoicePasswordText(result.transcript);
+    setVoicePasswordAudio(result.audioDataUrl);
     toast.success('Voice sample 1 captured! Please record once more.');
-    addLog('Voice sample 1 captured successfully.', 'info');
+    addLog('First voice sample captured successfully.', 'info');
     setStep('enroll2');
     setTimeout(() => setIsBiometricOpen(true), 800);
   };
 
-  const handleEnroll2Success = async (result: Float32Array) => {
+  const handleEnroll2Success = async (result: { voiceprint: Float32Array }) => {
     setIsBiometricOpen(false);
     setIsSaving(true);
     setSaveError(null);
     setStep('saving');
 
-    if (!voiceprint1 || !result || !auth.currentUser || !phraseSelection) {
+    if (!voiceprint1 || !result || !auth.currentUser || !languageSelection) {
       setSaveError('Enrollment data incomplete. Please start over.');
+      setStep('error');
+      setIsSaving(false);
+      return;
+    }
+
+    if (!voicePasswordText || !voicePasswordAudio) {
+      setSaveError('Voice password transcript is missing. Please re-enroll.');
       setStep('error');
       setIsSaving(false);
       return;
@@ -101,24 +116,29 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
 
       setSaveProgress('Saving profile to secure cloud (step 3/3)...');
 
-      const adminEmail = 'gayatrikharat62@gmail.com';
       const newUser: User = {
         uid: auth.currentUser.uid,
         name: userName.trim(),
         email: auth.currentUser.email || '',
         isEnrolled: true,
         voiceprint: Array.from(averagedVoiceprint),
-        role: auth.currentUser.email === adminEmail ? 'admin' : 'user',
+        role: 'user',
         createdAt: new Date().toISOString(),
         location: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        passPhrase: phraseSelection.phrase,
-        passPhraseLanguage: phraseSelection.language,
-        passPhraseLanguageCode: phraseSelection.languageCode,
+        passPhrase: voicePasswordText,
+        passPhraseAudio: voicePasswordAudio,
+        passPhraseLanguage: languageSelection.language,
+        passPhraseLanguageCode: languageSelection.languageCode,
         publicKey: keyMaterial.publicKey,
         encryptedPrivateKey: keyMaterial.encryptedPrivateKey,
       };
 
-      const writePromise = setDoc(doc(db, 'users', auth.currentUser.uid), newUser);
+      const userDocRef = doc(db, 'users', auth.currentUser.uid);
+      const existingDoc = await getDoc(userDocRef);
+      const writePromise = existingDoc.exists()
+        ? updateDoc(userDocRef, newUser)
+        : setDoc(userDocRef, newUser);
+
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(
           () =>
@@ -132,7 +152,7 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
 
       toast.success('Biometric profile enrolled and synchronised globally!');
       addLog(
-        `User ${newUser.name} enrolled with ${phraseSelection.language} passphrase from ${newUser.location}.`,
+        `User ${newUser.name} enrolled with ${languageSelection.language} voice password from ${newUser.location}.`,
         'success'
       );
       if (auth.currentUser) {
@@ -141,7 +161,7 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
           auth.currentUser,
           'ENROLL_COMPLETE',
           `Voice enrollment and keypair created for ${newUser.name}.`,
-          { language: phraseSelection.language }
+          { language: languageSelection.language }
         );
       }
       onUserEnrolled(newUser);
@@ -213,7 +233,7 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
           </div>
 
           <div className="flex items-center justify-center pt-1 pb-0.5 max-w-full overflow-x-auto gap-0 px-1">
-            {(['name', 'phrase', 'enroll1', 'enroll2'] as Step[]).map((s, i) => (
+            {(['name', 'language', 'enroll1', 'enroll2'] as Step[]).map((s, i) => (
               <React.Fragment key={s}>
                 {i > 0 && (
                   <div
@@ -268,15 +288,15 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
                     disabled={!userName.trim()}
                     className="w-full h-11 sm:h-12 bg-blue-600 hover:bg-blue-500 font-semibold text-base rounded-xl shadow-lg shadow-blue-900/20"
                   >
-                    Next: choose passphrase
+                    Next: select language
                   </Button>
                 </form>
               </motion.div>
             )}
 
-            {step === 'phrase' && (
+            {step === 'language' && (
               <motion.div
-                key="phrase"
+                key="language"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
@@ -284,9 +304,9 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
                 <div className="space-y-3">
                   <div className="flex items-start gap-2 text-slate-400 text-xs leading-relaxed">
                     <Languages className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                    <span>Choose a phrase in any language. Say this exact phrase when you authenticate.</span>
+                    <span>Select your voice password language. Speak a phrase naturally and the system will transcribe it.</span>
                   </div>
-                  <PhraseSelector onConfirm={handlePhraseConfirm} />
+                  <PhraseSelector onConfirm={handleLanguageConfirm} mode="languageOnly" />
                 </div>
               </motion.div>
             )}
@@ -368,14 +388,13 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
       </Card>
     </FlowModalShell>
 
-      {isBiometricOpen && step === 'enroll1' && phraseSelection && (
+      {isBiometricOpen && step === 'enroll1' && languageSelection && (
         <BiometricModal
           action={{
             type: 'enroll',
             user: { name: userName } as User,
-            passPhrase: phraseSelection.phrase,
-            passPhraseLanguage: phraseSelection.language,
-            passPhraseLanguageCode: phraseSelection.languageCode,
+            passPhraseLanguage: languageSelection.language,
+            passPhraseLanguageCode: languageSelection.languageCode,
             recordingLabel: 'Sample 1 of 2',
           }}
           onClose={onComplete}
@@ -384,14 +403,13 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
         />
       )}
 
-      {isBiometricOpen && step === 'enroll2' && phraseSelection && (
+      {isBiometricOpen && step === 'enroll2' && languageSelection && (
         <BiometricModal
           action={{
             type: 'enroll',
             user: { name: userName } as User,
-            passPhrase: phraseSelection.phrase,
-            passPhraseLanguage: phraseSelection.language,
-            passPhraseLanguageCode: phraseSelection.languageCode,
+            passPhraseLanguage: languageSelection.language,
+            passPhraseLanguageCode: languageSelection.languageCode,
             recordingLabel: 'Sample 2 of 2',
           }}
           onClose={onComplete}

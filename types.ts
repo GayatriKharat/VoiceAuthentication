@@ -11,6 +11,7 @@ export interface User {
   passPhrase?: string;
   passPhraseLanguage?: string;
   passPhraseLanguageCode?: string;
+  passPhraseAudio?: string; // Data URL of the enrolled voice password audio sample
 
   // Per-user RSA keypair for team file-sharing.
   // Only the teammates listed as recipients can unwrap a file's FEK.
@@ -118,10 +119,11 @@ export type AuthAction =
   | {
       type: 'enroll';
       user: Partial<User>;
-      passPhrase: string;
-      passPhraseLanguage: string;
-      passPhraseLanguageCode: string;
+      passPhrase?: string;
+      passPhraseLanguage?: string;
+      passPhraseLanguageCode?: string;
       recordingLabel?: string; // e.g. "Sample 1 of 2"
+      isPhraseCapture?: boolean;
     }
   | {
       type: 'verify';
