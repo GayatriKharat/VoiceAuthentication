@@ -376,7 +376,7 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
             <div className="bg-slate-800/50 p-5 rounded-2xl border border-slate-700/50 space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold text-blue-400 uppercase tracking-[0.2em]">
-                  Voice Password Capture:
+                  Voice Password Enrollment:
                 </p>
                 {langName && (
                   <span className="flex items-center gap-1 text-[10px] text-slate-500 font-semibold">
@@ -385,22 +385,20 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
                   </span>
                 )}
               </div>
-              <h3
-                className="text-lg font-medium text-white italic leading-snug"
-                dir={rtl ? 'rtl' : 'ltr'}
-              >
-                {requiredPhrase
-                  ? `Speak the same phrase as displayed when enrolling.`
-                  : 'Speak your voice password phrase clearly. The system will transcribe it and ask for correction.'}
+              <h3 className="text-lg font-medium text-white italic leading-snug">
+                Speak your voice password from memory
               </h3>
             </div>
           )}
 
-          {/* Language indicator during verification */}
+          {/* Language and hint during verification */}
           {action.type !== 'enroll' && langName && (
-            <div className="bg-blue-600/10 p-4 rounded-2xl border border-blue-500/20 flex items-center justify-center gap-2">
-              <Globe className="w-4 h-4 text-blue-400" />
-              <span className="text-sm font-semibold text-blue-300">Verification Language: {langName}</span>
+            <div className="bg-blue-600/10 p-4 rounded-2xl border border-blue-500/20 space-y-2">
+              <div className="flex items-center justify-center gap-2">
+                <Globe className="w-4 h-4 text-blue-400" />
+                <span className="text-sm font-semibold text-blue-300">Verification Language: {langName}</span>
+              </div>
+              <p className="text-xs text-blue-300 italic">Speak your voice password phrase</p>
             </div>
           )}
 
