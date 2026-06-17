@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import type { UserSecurityEvent } from '../types';
 import { ScrollArea } from './ui/scroll-area';
 import { Shield, Activity } from 'lucide-react';
+import { handleFirestoreError, OperationType } from '../firebase';
 
 const toValidDate = (value: unknown): Date | null => {
   if (!value) return null;
@@ -62,6 +63,7 @@ interface SecurityActivityPanelProps {
 
 const SecurityActivityPanel: React.FC<SecurityActivityPanelProps> = ({ userUid }) => {
   const [events, setEvents] = React.useState<UserSecurityEvent[]>([]);
+  const [listenerError, setListenerError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const q = query(
@@ -73,16 +75,26 @@ const SecurityActivityPanel: React.FC<SecurityActivityPanelProps> = ({ userUid }
     const unsub = onSnapshot(
       q,
       (snap) => {
+        setListenerError(null);
         setEvents(
           snap.docs.map((d) => ({ id: d.id, ...d.data() } as UserSecurityEvent))
         );
       },
-      (err) => console.warn('Security activity listener:', err)
+      (err) => {
+        console.warn('Security activity listener:', err);
+        setListenerError(String(err instanceof Error ? err.message : err));
+        try {
+          handleFirestoreError(err, OperationType.LIST, 'user_security_events');
+        } catch (e) {
+          console.warn('Failed to call handleFirestoreError:', e);
+        }
+      }
     );
     return () => unsub();
   }, [userUid]);
 
   const empty = useMemo(() => events.length === 0, [events.length]);
+  const [showCreateTestEvent, setShowCreateTestEvent] = React.useState(false);
 
   return (
     <div className="rounded-2xl border border-slate-800/70 bg-slate-900/50 overflow-hidden">
@@ -103,6 +115,16 @@ const SecurityActivityPanel: React.FC<SecurityActivityPanelProps> = ({ userUid }
             <p className="text-xs text-slate-600 text-center">
               Sign in, enroll, or use encrypt/decrypt to populate this log.
             </p>
+            {listenerError && (
+              <p className="text-xs text-red-400 mt-2 text-center">Listener error: {listenerError}</p>
+            )}
+            <div className="mt-3 text-[11px] text-slate-500 text-center">
+              <p>If you recently triggered events but see nothing, check browser console for:</p>
+              <ul className="list-disc list-inside mt-1">
+                <li>Firestore listener errors (permission issues).</li>
+                <li>Logs from <span className="font-medium">handleFirestoreError</span> and <span className="font-medium">securityAudit</span>.</li>
+              </ul>
+            </div>
           </div>
         ) : (
           <ul className="divide-y divide-slate-800/50">
@@ -124,6 +146,48 @@ const SecurityActivityPanel: React.FC<SecurityActivityPanelProps> = ({ userUid }
           </ul>
         )}
       </ScrollArea>
+      <div className="px-4 py-3 border-t border-slate-800/60 flex items-center justify-between">
+        <div className="text-xs text-slate-500">Diagnostics</div>
+        <div className="flex items-center gap-2">
+          <button
+            className="text-xs px-2 py-1 rounded bg-slate-800/60 hover:bg-slate-800/70"
+            onClick={() => {
+              setShowCreateTestEvent((s) => !s);
+            }}
+          >
+            {showCreateTestEvent ? 'Hide' : 'Create test event'}
+          </button>
+        </div>
+      </div>
+      {showCreateTestEvent && (
+        <div className="p-4 border-t border-slate-800/60 bg-slate-900/40">
+          <p className="text-xs text-slate-400 mb-2">Create a sample `user_security_events` document (client will attempt to write as the current user).</p>
+          <button
+            className="text-sm px-3 py-1 rounded bg-blue-500 text-white"
+            onClick={async () => {
+              try {
+                // Lazy import to avoid circular module load issues in tests
+                const mod = await import('../utils/securityAudit');
+                const { recordSecurityEvent } = mod;
+                // get auth currentUser from firebase directly
+                const { auth, db } = await import('../firebase');
+                if (!auth.currentUser) {
+                  throw new Error('Not signed in');
+                }
+                await recordSecurityEvent(db, auth.currentUser, 'LOGIN_SUCCESS', 'Test event created from UI');
+                // eslint-disable-next-line no-alert
+                alert('Test event write attempted — check console for result.');
+              } catch (e) {
+                console.error('Failed to create test event:', e);
+                // eslint-disable-next-line no-alert
+                alert('Failed to create test event: ' + String(e));
+              }
+            }}
+          >
+            Write test event
+          </button>
+        </div>
+      )}
     </div>
   );
 };

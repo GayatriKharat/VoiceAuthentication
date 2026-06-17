@@ -15,7 +15,7 @@ export async function recordSecurityEvent(
   metadata?: Record<string, string>
 ): Promise<void> {
   try {
-    await addDoc(collection(db, 'user_security_events'), {
+    const docRef = await addDoc(collection(db, 'user_security_events'), {
       userId: user.uid,
       action,
       summary,
@@ -26,6 +26,8 @@ export async function recordSecurityEvent(
         typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 240) : '',
       createdAt: serverTimestamp(),
     });
+    // Return the doc id in a debug-friendly console log to help troubleshooting
+    console.debug('[securityAudit] event created', { id: docRef.id, action, userId: user.uid });
   } catch (e) {
     console.warn('[securityAudit] Failed to record event:', e);
   }

@@ -137,3 +137,59 @@ export const requestLoginDigestEmail = onCall(
     return { ok: true, sent: true };
   }
 );
+
+export const sendEncryptedFileEmail = onCall(
+  {
+    region: 'us-central1',
+    cors: true,
+    timeoutSeconds: 90,
+  },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError('unauthenticated', 'You must be signed in.');
+    }
+
+    const { recipients, subject, text, html, fileName, fileContent } = request.data || {};
+    if (!Array.isArray(recipients) || recipients.length === 0) {
+      throw new HttpsError('invalid-argument', 'No recipients provided.');
+    }
+
+    const host = process.env.SMTP_HOST?.trim();
+    const port = Number(process.env.SMTP_PORT || '587');
+    const smtpUser = process.env.SMTP_USER?.trim();
+    const smtpPass = process.env.SMTP_PASS?.trim();
+    const from = process.env.SMTP_FROM?.trim() || smtpUser || 'noreply@localhost';
+
+    if (!host || !smtpUser || !smtpPass) {
+      console.warn('sendEncryptedFileEmail: SMTP not configured. Skipping send.');
+      return { ok: true, sent: false, reason: 'smtp-not-configured' };
+    }
+
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user: smtpUser, pass: smtpPass },
+    });
+
+    const mailOpts: nodemailer.SendMailOptions = {
+      from,
+      to: recipients.join(','),
+      subject: subject || 'Shared file from Voice Auth',
+      text: text || 'A secure file has been shared with you.',
+      html: html,
+      attachments: [],
+    };
+
+    if (fileName && fileContent) {
+      mailOpts.attachments!.push({
+        filename: fileName,
+        content: Buffer.from(String(fileContent)),
+        contentType: 'application/json',
+      });
+    }
+
+    await transporter.sendMail(mailOpts);
+    return { ok: true, sent: true };
+  }
+);

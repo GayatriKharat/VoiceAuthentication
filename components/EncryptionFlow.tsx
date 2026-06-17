@@ -49,6 +49,11 @@ const EncryptionFlow: React.FC<EncryptionFlowProps> = ({
   const [fileToEncrypt, setFileToEncrypt] = useState<File | null>(null);
   const [encryptedFileUrl, setEncryptedFileUrl] = useState<string | null>(null);
   const [encryptedFileName, setEncryptedFileName] = useState('');
+  const [encryptedPayload, setEncryptedPayload] = useState<any | null>(null);
+  const [showEmailComposer, setShowEmailComposer] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('Secure file shared with you');
+  const [emailBody, setEmailBody] = useState('I have shared a secure file with you. The encrypted attachment is included.');
+  const [sendInProgress, setSendInProgress] = useState(false);
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
   const [selectedUids, setSelectedUids] = useState<Set<string>>(new Set());
   const [includeSelf, setIncludeSelf] = useState(true);
@@ -167,6 +172,7 @@ const EncryptionFlow: React.FC<EncryptionFlowProps> = ({
         type: 'application/json',
       });
 
+      setEncryptedPayload(encryptedData);
       setEncryptedFileUrl(URL.createObjectURL(blob));
       setEncryptedFileName(newEncryptedFileName);
       setStep('download');
@@ -502,7 +508,7 @@ const EncryptionFlow: React.FC<EncryptionFlowProps> = ({
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {includeSelf && (
-                      <span className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold rounded-lg flex items-center gap-1">
+                      <span className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 text-white text-[11px] font-semibold rounded-lg flex items-center gap-1">
                         <Check className="w-3 h-3" />
                         {currentUserProfile.name} (You)
                       </span>
@@ -512,7 +518,7 @@ const EncryptionFlow: React.FC<EncryptionFlowProps> = ({
                       .map((t) => (
                         <span
                           key={t.uid}
-                          className="px-2.5 py-1 bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-[11px] font-semibold rounded-lg flex items-center gap-1"
+                          className="px-2.5 py-1 bg-indigo-500/10 border border-indigo-500/30 text-white text-[11px] font-semibold rounded-lg flex items-center gap-1"
                         >
                           <Check className="w-3 h-3" />
                           {t.name}
@@ -530,14 +536,93 @@ const EncryptionFlow: React.FC<EncryptionFlowProps> = ({
                       Download Vault
                     </a>
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={onComplete}
-                    className="h-14 border-slate-800 text-slate-400 hover:bg-slate-800 rounded-2xl font-bold"
-                  >
-                    Close Session
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => setShowEmailComposer((s) => !s)}
+                      className="h-14 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold"
+                    >
+                      {showEmailComposer ? 'Hide Email' : 'Compose & Send Email'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={onComplete}
+                      className="h-14 border-slate-800 text-slate-400 hover:bg-slate-800 rounded-2xl font-bold"
+                    >
+                      Close Session
+                    </Button>
+                  </div>
                 </div>
+                {showEmailComposer && (
+                  <div className="mt-4 space-y-3 p-4 bg-slate-800/30 border border-slate-800 rounded-2xl">
+                    <p className="text-sm font-semibold text-white">Email recipients</p>
+                    <div className="text-xs text-white">{[...new Set([
+                      ...(includeSelf ? [currentUserProfile.email] : []),
+                      ...teammates.filter((t) => selectedUids.has(t.uid)).map((t) => t.email || '')
+                    ])].filter(Boolean).join(', ')}</div>
+                    <label className="block">
+                      <p className="text-xs text-white">Subject</p>
+                      <input value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} className="w-full mt-1 p-2 bg-slate-900 border border-slate-700 rounded text-white placeholder-slate-500" />
+                    </label>
+                    <label className="block">
+                      <p className="text-xs text-white">Message</p>
+                      <textarea value={emailBody} onChange={(e) => setEmailBody(e.target.value)} rows={4} className="w-full mt-1 p-2 bg-slate-900 border border-slate-700 rounded text-white placeholder-slate-500" />
+                    </label>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={async () => {
+                          setSendInProgress(true);
+                          try {
+                            const functionsMod = await import('firebase/functions');
+                            const { httpsCallable } = functionsMod;
+                            const { getFirebaseFunctions } = await import('../firebase');
+                            const recipients = [...new Set([
+                              ...(includeSelf ? [currentUserProfile.email] : []),
+                              ...teammates.filter((t) => selectedUids.has(t.uid)).map((t) => t.email || '')
+                            ])].filter(Boolean) as string[];
+                            if (recipients.length === 0) throw new Error('No recipient emails available');
+                            // Call cloud function
+                            const fn = httpsCallable(getFirebaseFunctions(), 'sendEncryptedFileEmail');
+                            const payload = {
+                              recipients,
+                              subject: emailSubject,
+                              text: emailBody,
+                              fileName: encryptedFileName,
+                              fileContent: JSON.stringify(encryptedPayload),
+                            };
+                            const res = await fn(payload);
+                            // res.data expected { ok, sent }
+                            if (res && res.data && res.data.sent) {
+                              toast.success('Email sent to recipients.');
+                            } else {
+                              toast('Email not sent (SMTP may be unconfigured).');
+                            }
+
+                            // record security event of file send
+                            if (auth.currentUser) {
+                              await recordSecurityEvent(db, auth.currentUser, 'FILE_ENCRYPT', `Sent “${fileToEncrypt?.name}” to ${recipients.length} recipient(s).`, { fileName: fileToEncrypt?.name || '', recipients: JSON.stringify(recipients) });
+                            }
+                          } catch (e) {
+                            console.error('Send email failed', e);
+                            toast.error('Failed to send email: ' + String(e));
+                          } finally {
+                            setSendInProgress(false);
+                          }
+                        }}
+                        disabled={sendInProgress}
+                        className="h-10 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl px-4"
+                      >
+                        Send Email
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowEmailComposer(false)}
+                        className="h-10 border-slate-800 text-slate-400 hover:bg-slate-800 rounded-2xl px-4"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

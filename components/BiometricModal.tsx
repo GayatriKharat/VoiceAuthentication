@@ -151,21 +151,33 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
           return;
         }
 
-        // --- Phrase verification (if SpeechRecognition available) ---
+        // --- Phrase verification for authentication ---
         const transcript = transcriptRef.current.trim();
-        if (hasSpeechRecognition && action.type !== 'enroll') {
-          if (transcript) {
-            const score = phraseMatchScore(transcript, requiredPhrase);
-            if (score < PHRASE_MATCH_THRESHOLD) {
-              const confidence = (score * 100).toFixed(0);
-              setErrorMessage(
-                `Wrong phrase detected (${confidence}% match). Please say exactly: "${requiredPhrase}"`
-              );
-              setStatus('error');
-              return;
-            }
-            setPhraseVerified(true);
+        if (action.type !== 'enroll') {
+          if (!hasSpeechRecognition) {
+            setErrorMessage(
+              'Speech recognition is unavailable in this browser. Please use Chrome or Edge to authenticate with voice and transcript.'
+            );
+            setStatus('error');
+            return;
           }
+
+          if (!transcript) {
+            setErrorMessage('No spoken phrase detected. Please speak your enrolled voice password clearly.');
+            setStatus('error');
+            return;
+          }
+
+          const score = phraseMatchScore(transcript, requiredPhrase);
+          if (score < PHRASE_MATCH_THRESHOLD) {
+            const confidence = (score * 100).toFixed(0);
+            setErrorMessage(
+              `Phrase mismatch (${confidence}% match). Please try speaking your enrolled voice password again.`
+            );
+            setStatus('error');
+            return;
+          }
+          setPhraseVerified(true);
         }
 
         try {
@@ -214,12 +226,20 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
                 onFailure(verifyResult.reason);
                 return;
               }
-              onSuccess({ user: action.user, voiceprint: currentVoiceprint });
+              onSuccess({
+                user: action.user,
+                voiceprint: currentVoiceprint,
+                transcript,
+              });
             } else {
               // Standard verification without language enforcement (e.g., regular login)
               const score = getVoiceSimilarityScore(storedVp, currentVoiceprint);
               if (score >= SIMILARITY_THRESHOLD) {
-                onSuccess({ user: action.user, voiceprint: currentVoiceprint });
+                onSuccess({
+                  user: action.user,
+                  voiceprint: currentVoiceprint,
+                  transcript,
+                });
               } else {
                 const confidence = score > 0 ? (score * 100).toFixed(1) : '0';
                 onFailure(`Voice not recognised (${confidence}% match). Access denied.`);
@@ -398,8 +418,23 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
                 </p>
                 <p className="text-sm text-slate-300 italic min-h-[1.25rem]" dir={rtl ? 'rtl' : 'ltr'}>
                   {liveTranscript || (
-                    <span className="text-slate-600">Start speaking...</span>
+                    <span className="text-slate-600">Start speaking your enrolled voice password...</span>
                   )}
+                </p>
+              </motion.div>
+            )}
+            {status === 'recording' && !hasSpeechRecognition && action.type !== 'enroll' && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-slate-800/30 border border-slate-700/30 rounded-2xl px-4 py-3 text-left"
+              >
+                <p className="text-[10px] text-slate-600 uppercase font-bold tracking-widest mb-1">
+                  Voice phrase required
+                </p>
+                <p className="text-sm text-slate-300 italic min-h-[1.25rem]">
+                  Your browser does not support live phrase transcription. Use Chrome or Edge for full voice password verification.
                 </p>
               </motion.div>
             )}
