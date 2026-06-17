@@ -99,7 +99,9 @@ const EnrollmentFlow: React.FC<EnrollmentFlowProps> = ({
     }
 
     if (!voicePasswordText || !voicePasswordAudio) {
-      setSaveError('Voice password transcript is missing. Please re-enroll.');
+      setSaveError(
+        'Voice password transcript is missing. Please restart enrollment and make sure the transcript is entered before saving.'
+      );
       setStep('error');
       setIsSaving(false);
       return;

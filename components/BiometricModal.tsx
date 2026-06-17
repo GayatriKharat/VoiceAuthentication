@@ -393,6 +393,11 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
                   ? `Speak the same phrase as displayed when enrolling.`
                   : 'Speak your voice password phrase clearly. The system will transcribe it and ask for correction.'}
               </h3>
+              {!hasSpeechRecognition && (
+                <p className="text-xs text-amber-300">
+                  Speech recognition is unavailable in this browser. After recording, type the phrase you spoke into the transcript box below.
+                </p>
+              )}
             </div>
           )}
 
@@ -571,7 +576,8 @@ const BiometricModal: React.FC<BiometricModalProps> = ({ action, onClose, onSucc
                 value={reviewTranscript}
                 onChange={(e) => setReviewTranscript(e.target.value)}
                 rows={4}
-                className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
+                placeholder="If the transcript is blank or incorrect, type the phrase you just spoke here."
+                className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
               />
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <button
